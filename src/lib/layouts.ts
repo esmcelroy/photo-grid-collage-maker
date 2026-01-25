@@ -1,0 +1,560 @@
+import { GridLayout } from './types'
+
+export const GRID_LAYOUTS: GridLayout[] = [
+  {
+    id: '1-single',
+    name: 'Single',
+    photoCount: 1,
+    gridTemplate: '1fr',
+    areas: ['a'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '1-portrait',
+    name: 'Portrait',
+    photoCount: 1,
+    gridTemplate: '1fr',
+    areas: ['a'],
+    aspectRatio: '3/4'
+  },
+  {
+    id: '1-square',
+    name: 'Square',
+    photoCount: 1,
+    gridTemplate: '1fr',
+    areas: ['a'],
+    aspectRatio: '1/1'
+  },
+  {
+    id: '1-landscape',
+    name: 'Landscape',
+    photoCount: 1,
+    gridTemplate: '1fr',
+    areas: ['a'],
+    aspectRatio: '16/9'
+  },
+  {
+    id: '1-wide',
+    name: 'Panoramic',
+    photoCount: 1,
+    gridTemplate: '1fr',
+    areas: ['a'],
+    aspectRatio: '21/9'
+  },
+  
+  {
+    id: '2-horizontal',
+    name: 'Side by Side',
+    photoCount: 2,
+    gridTemplate: '1fr 1fr',
+    areas: ['a', 'b'],
+    aspectRatio: '16/9'
+  },
+  {
+    id: '2-vertical',
+    name: 'Stacked',
+    photoCount: 2,
+    gridTemplate: '1fr / 1fr',
+    areas: ['a', 'b'],
+    aspectRatio: '9/16'
+  },
+  {
+    id: '2-left-large',
+    name: 'Left Focus',
+    photoCount: 2,
+    gridTemplate: '2fr 1fr',
+    areas: ['a', 'b'],
+    aspectRatio: '16/9'
+  },
+  {
+    id: '2-right-large',
+    name: 'Right Focus',
+    photoCount: 2,
+    gridTemplate: '1fr 2fr',
+    areas: ['a', 'b'],
+    aspectRatio: '16/9'
+  },
+  {
+    id: '2-top-large',
+    name: 'Top Focus',
+    photoCount: 2,
+    gridTemplate: '2fr 1fr / 1fr',
+    areas: ['a', 'b'],
+    aspectRatio: '3/4'
+  },
+  {
+    id: '2-bottom-large',
+    name: 'Bottom Focus',
+    photoCount: 2,
+    gridTemplate: '1fr 2fr / 1fr',
+    areas: ['a', 'b'],
+    aspectRatio: '3/4'
+  },
+  {
+    id: '2-square',
+    name: 'Square Split',
+    photoCount: 2,
+    gridTemplate: '1fr 1fr',
+    areas: ['a', 'b'],
+    aspectRatio: '1/1'
+  },
+  
+  {
+    id: '3-row',
+    name: 'Three Across',
+    photoCount: 3,
+    gridTemplate: '1fr 1fr 1fr',
+    areas: ['a', 'b', 'c'],
+    aspectRatio: '21/9'
+  },
+  {
+    id: '3-column',
+    name: 'Three Down',
+    photoCount: 3,
+    gridTemplate: '1fr / 1fr 1fr 1fr',
+    areas: ['a', 'b', 'c'],
+    aspectRatio: '9/16'
+  },
+  {
+    id: '3-left-stack',
+    name: 'Left with Stack',
+    photoCount: 3,
+    gridTemplate: '1fr 1fr / 2fr 1fr',
+    areas: ['a a', 'b c'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '3-right-stack',
+    name: 'Right with Stack',
+    photoCount: 3,
+    gridTemplate: '1fr 1fr / 1fr 2fr',
+    areas: ['a b b', 'a c c'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '3-top-row',
+    name: 'Top with Bottom',
+    photoCount: 3,
+    gridTemplate: '1fr 1fr / 1fr 1fr',
+    areas: ['a a', 'b c'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '3-bottom-row',
+    name: 'Bottom with Top',
+    photoCount: 3,
+    gridTemplate: '1fr 1fr / 1fr 1fr',
+    areas: ['a b', 'c c'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '3-center-focus',
+    name: 'Center Focus',
+    photoCount: 3,
+    gridTemplate: '1fr 2fr 1fr',
+    areas: ['a', 'b', 'c'],
+    aspectRatio: '16/9'
+  },
+  {
+    id: '3-pyramid',
+    name: 'Pyramid',
+    photoCount: 3,
+    gridTemplate: '1fr 1fr / 1fr 1fr',
+    areas: ['a a', 'b c'],
+    aspectRatio: '1/1'
+  },
+  {
+    id: '3-l-shape',
+    name: 'L-Shape',
+    photoCount: 3,
+    gridTemplate: '1fr 1fr / 1fr 1fr',
+    areas: ['a b', 'a c'],
+    aspectRatio: '1/1'
+  },
+  
+  {
+    id: '4-grid',
+    name: 'Classic Grid',
+    photoCount: 4,
+    gridTemplate: '1fr 1fr / 1fr 1fr',
+    areas: ['a b', 'c d'],
+    aspectRatio: '1/1'
+  },
+  {
+    id: '4-row',
+    name: 'Four Across',
+    photoCount: 4,
+    gridTemplate: '1fr 1fr 1fr 1fr',
+    areas: ['a', 'b', 'c', 'd'],
+    aspectRatio: '21/9'
+  },
+  {
+    id: '4-column',
+    name: 'Four Down',
+    photoCount: 4,
+    gridTemplate: '1fr / 1fr 1fr 1fr 1fr',
+    areas: ['a', 'b', 'c', 'd'],
+    aspectRatio: '9/21'
+  },
+  {
+    id: '4-left-focus',
+    name: 'Left Hero',
+    photoCount: 4,
+    gridTemplate: '1fr 1fr / 2fr 1fr',
+    areas: ['a b', 'a c', 'a d'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '4-right-focus',
+    name: 'Right Hero',
+    photoCount: 4,
+    gridTemplate: '1fr 1fr 1fr / 1fr 2fr',
+    areas: ['a b', 'c b', 'd b'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '4-top-bottom',
+    name: 'Top & Bottom Pairs',
+    photoCount: 4,
+    gridTemplate: '1fr 1fr / 1fr 1fr',
+    areas: ['a b', 'c d'],
+    aspectRatio: '16/9'
+  },
+  {
+    id: '4-center-focus',
+    name: 'Center Spotlight',
+    photoCount: 4,
+    gridTemplate: '1fr 2fr 1fr / 1fr 1fr',
+    areas: ['a a', 'b c', 'd d'],
+    aspectRatio: '3/4'
+  },
+  {
+    id: '4-t-shape',
+    name: 'T-Shape',
+    photoCount: 4,
+    gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a a a', 'b c d'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '4-corners',
+    name: 'Wide Grid',
+    photoCount: 4,
+    gridTemplate: '1fr 1fr / 1fr 1fr',
+    areas: ['a b', 'c d'],
+    aspectRatio: '16/9'
+  },
+  
+  {
+    id: '5-plus',
+    name: 'Plus Sign',
+    photoCount: 5,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a b a', 'c d e', 'a b a'],
+    aspectRatio: '1/1'
+  },
+  {
+    id: '5-top-one',
+    name: 'Top Hero',
+    photoCount: 5,
+    gridTemplate: '2fr 1fr / 1fr 1fr 1fr 1fr',
+    areas: ['a a a a', 'b c d e'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '5-left-two',
+    name: 'Left Column',
+    photoCount: 5,
+    gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a b c', 'd e e'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '5-grid-top',
+    name: 'Grid with Top',
+    photoCount: 5,
+    gridTemplate: '1fr 1fr / 1fr 1fr',
+    areas: ['a a', 'b c', 'd e'],
+    aspectRatio: '3/4'
+  },
+  {
+    id: '5-center',
+    name: 'Center Focus',
+    photoCount: 5,
+    gridTemplate: '1fr 1fr / 1fr 2fr 1fr',
+    areas: ['a b c', 'd e e'],
+    aspectRatio: '16/9'
+  },
+  {
+    id: '5-pyramid',
+    name: 'Pyramid',
+    photoCount: 5,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr',
+    areas: ['a a', 'b c', 'd e'],
+    aspectRatio: '4/5'
+  },
+  {
+    id: '5-scattered',
+    name: 'Asymmetric',
+    photoCount: 5,
+    gridTemplate: '1fr 1fr / 2fr 1fr 1fr',
+    areas: ['a a b', 'c d e'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '5-bottom-row',
+    name: 'Bottom Row',
+    photoCount: 5,
+    gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a a b', 'c d e'],
+    aspectRatio: '16/9'
+  },
+  
+  {
+    id: '6-grid',
+    name: 'Classic 2x3',
+    photoCount: 6,
+    gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a b c', 'd e f'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '6-grid-vertical',
+    name: 'Classic 3x2',
+    photoCount: 6,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr',
+    areas: ['a b', 'c d', 'e f'],
+    aspectRatio: '3/4'
+  },
+  {
+    id: '6-two-rows',
+    name: 'Two Rows',
+    photoCount: 6,
+    gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a b c', 'd e f'],
+    aspectRatio: '16/9'
+  },
+  {
+    id: '6-left-hero',
+    name: 'Left Hero',
+    photoCount: 6,
+    gridTemplate: '1fr 1fr / 2fr 1fr 1fr',
+    areas: ['a b c', 'a d e', 'a f f'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '6-center-large',
+    name: 'Center Large',
+    photoCount: 6,
+    gridTemplate: '1fr 1fr / 1fr 2fr 1fr',
+    areas: ['a b c', 'd e f'],
+    aspectRatio: '16/9'
+  },
+  {
+    id: '6-bookends',
+    name: 'Bookends',
+    photoCount: 6,
+    gridTemplate: '1fr 1fr / 2fr 1fr 1fr 2fr',
+    areas: ['a b c d', 'a e f d'],
+    aspectRatio: '16/9'
+  },
+  {
+    id: '6-top-bottom',
+    name: 'Top-Bottom Focus',
+    photoCount: 6,
+    gridTemplate: '2fr 1fr 2fr / 1fr 1fr',
+    areas: ['a a', 'b c', 'd d', 'e f'],
+    aspectRatio: '3/4'
+  },
+  {
+    id: '6-scattered',
+    name: 'Mixed Sizes',
+    photoCount: 6,
+    gridTemplate: '1fr 1fr / 2fr 1fr 1fr',
+    areas: ['a a b', 'c d e', 'f f f'],
+    aspectRatio: '4/3'
+  },
+  
+  {
+    id: '7-flower',
+    name: 'Flower Pattern',
+    photoCount: 7,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a b c', 'd e f', 'g g g'],
+    aspectRatio: '1/1'
+  },
+  {
+    id: '7-top-hero',
+    name: 'Top Hero',
+    photoCount: 7,
+    gridTemplate: '2fr 1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a a a', 'b c d', 'e f g'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '7-left-column',
+    name: 'Left Column',
+    photoCount: 7,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a b c', 'a d e', 'f g g'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '7-center-focus',
+    name: 'Center Focus',
+    photoCount: 7,
+    gridTemplate: '1fr 1fr 1fr / 1fr 2fr 1fr',
+    areas: ['a b c', 'd e f', 'g e g'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '7-rows',
+    name: 'Three Rows',
+    photoCount: 7,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a a b', 'c d e', 'f g g'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '7-asymmetric',
+    name: 'Asymmetric',
+    photoCount: 7,
+    gridTemplate: '1fr 1fr / 2fr 1fr 1fr',
+    areas: ['a a b', 'c d e', 'f g g'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '7-bottom-row',
+    name: 'Bottom Wide',
+    photoCount: 7,
+    gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a b c', 'd e f', 'g g g'],
+    aspectRatio: '4/3'
+  },
+  
+  {
+    id: '8-grid',
+    name: 'Classic 4x2',
+    photoCount: 8,
+    gridTemplate: '1fr 1fr / 1fr 1fr 1fr 1fr',
+    areas: ['a b c d', 'e f g h'],
+    aspectRatio: '16/9'
+  },
+  {
+    id: '8-grid-tall',
+    name: 'Classic 2x4',
+    photoCount: 8,
+    gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr',
+    areas: ['a b', 'c d', 'e f', 'g h'],
+    aspectRatio: '9/16'
+  },
+  {
+    id: '8-center-large',
+    name: 'Center Quad',
+    photoCount: 8,
+    gridTemplate: '1fr 2fr 1fr / 1fr 2fr 1fr',
+    areas: ['a b c', 'd e f', 'g h h'],
+    aspectRatio: '1/1'
+  },
+  {
+    id: '8-sides',
+    name: 'Side Columns',
+    photoCount: 8,
+    gridTemplate: '1fr 1fr 1fr 1fr / 1fr 2fr 1fr',
+    areas: ['a b c', 'd e f', 'g e h'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '8-top-bottom',
+    name: 'Top & Bottom',
+    photoCount: 8,
+    gridTemplate: '1fr 1fr / 1fr 1fr 1fr 1fr',
+    areas: ['a b c d', 'e f g h'],
+    aspectRatio: '21/9'
+  },
+  {
+    id: '8-mixed',
+    name: 'Mixed Sizes',
+    photoCount: 8,
+    gridTemplate: '1fr 1fr / 2fr 1fr 1fr',
+    areas: ['a a b', 'c d e', 'f g h'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '8-corners',
+    name: 'Corner Focus',
+    photoCount: 8,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a b c', 'd d d', 'e f g', 'h h h'],
+    aspectRatio: '3/4'
+  },
+  
+  {
+    id: '9-grid',
+    name: 'Perfect Grid',
+    photoCount: 9,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a b c', 'd e f', 'g h i'],
+    aspectRatio: '1/1'
+  },
+  {
+    id: '9-center-large',
+    name: 'Center Hero',
+    photoCount: 9,
+    gridTemplate: '1fr 2fr 1fr / 1fr 2fr 1fr',
+    areas: ['a b c', 'd e f', 'g h i'],
+    aspectRatio: '1/1'
+  },
+  {
+    id: '9-corners-large',
+    name: 'Corner Focus',
+    photoCount: 9,
+    gridTemplate: '2fr 1fr 2fr / 2fr 1fr 2fr',
+    areas: ['a b c', 'd e f', 'g h i'],
+    aspectRatio: '1/1'
+  },
+  {
+    id: '9-cross',
+    name: 'Cross Pattern',
+    photoCount: 9,
+    gridTemplate: '1fr 1fr 1fr / 1fr 2fr 1fr',
+    areas: ['a b c', 'd e f', 'g h i'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '9-rows',
+    name: 'Three Rows',
+    photoCount: 9,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a b c', 'd e f', 'g h i'],
+    aspectRatio: '16/9'
+  },
+  {
+    id: '9-columns',
+    name: 'Three Columns',
+    photoCount: 9,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a b c', 'd e f', 'g h i'],
+    aspectRatio: '9/16'
+  },
+  {
+    id: '9-pyramid',
+    name: 'Pyramid',
+    photoCount: 9,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
+    areas: ['a a b b', 'c d e e', 'f g h i'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '9-frame',
+    name: 'Frame',
+    photoCount: 9,
+    gridTemplate: '1fr 2fr 1fr / 1fr 2fr 1fr',
+    areas: ['a b c', 'd e f', 'g h i'],
+    aspectRatio: '1/1'
+  }
+]
+
+export function getLayoutsForPhotoCount(count: number): GridLayout[] {
+  return GRID_LAYOUTS.filter(layout => layout.photoCount === count)
+}
