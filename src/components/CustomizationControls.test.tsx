@@ -9,11 +9,11 @@ import { CustomizationControls } from '@/components/CustomizationControls'
 // jest.mock hoist-time issues with the automatic JSX runtime in ESM mode.
 jest.mock('@/components/ui/popover', () => ({
   Popover: (props: Record<string, unknown>) =>
-    React.createElement('div', null, props.children),
+    React.createElement('div', null, props.children as React.ReactNode),
   PopoverTrigger: (props: Record<string, unknown>) =>
-    React.createElement(React.Fragment, null, props.children),
+    React.createElement(React.Fragment, null, props.children as React.ReactNode),
   PopoverContent: (props: Record<string, unknown>) =>
-    React.createElement('div', null, props.children),
+    React.createElement('div', null, props.children as React.ReactNode),
 }))
 
 // Intentionally NOT mocking the Slider: mocking with JSX or React.createElement
