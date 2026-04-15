@@ -3,7 +3,7 @@ import path from 'path'
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../collage.db')
 
-let db: Database.Database
+let db: Database.Database | undefined
 
 export function getDb(): Database.Database {
   if (!db) {

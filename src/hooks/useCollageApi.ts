@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { UploadedPhoto, PhotoPosition, CollageSettings } from '@/lib/types'
 
@@ -94,9 +95,15 @@ async function removePhotoRequest(collageId: string, photoId: string): Promise<v
   if (!res.ok) throw new Error('Failed to remove photo')
 }
 
+function getMimeTypeFromDataUrl(dataUrl: string): string {
+  const match = dataUrl.match(/^data:(image\/[^;]+);/i)
+  return match?.[1] ?? 'image/jpeg'
+}
+
 function apiPhotoToUploadedPhoto(apiPhoto: ApiPhoto): UploadedPhoto {
-  const blob = new Blob([], { type: 'image/jpeg' })
-  const file = new File([blob], apiPhoto.fileName, { type: 'image/jpeg' })
+  const mimeType = getMimeTypeFromDataUrl(apiPhoto.dataUrl)
+  const blob = new Blob([], { type: mimeType })
+  const file = new File([blob], apiPhoto.fileName, { type: mimeType })
   return { id: apiPhoto.id, file, dataUrl: apiPhoto.dataUrl }
 }
 
@@ -133,7 +140,15 @@ export function useCollageApi() {
   const addPhotoMutation = useMutation({
     mutationFn: (photo: { id: string; dataUrl: string; fileName: string }) =>
       addPhotoRequest(sessionId!, photo),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+    onSuccess: (apiPhoto) => {
+      queryClient.setQueryData<CollageApiState | undefined>(queryKey, (current) => {
+        if (!current) return current
+        return {
+          ...current,
+          photos: [...current.photos, apiPhotoToUploadedPhoto(apiPhoto)],
+        }
+      })
+    },
   })
 
   const removePhotoMutation = useMutation({
@@ -168,6 +183,22 @@ export function useCollageApi() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['collage'] }),
   })
 
+  const initCollage = useCallback(() => initMutation.mutate(), [initMutation])
+  const updateLayout = useCallback(
+    (selectedLayoutId: string | null, photoPositions: PhotoPosition[]) =>
+      updateLayoutMutation.mutateAsync({ selectedLayoutId, photoPositions }),
+    [updateLayoutMutation]
+  )
+  const updatePositions = useCallback(
+    (photoPositions: PhotoPosition[]) =>
+      updatePositionsMutation.mutateAsync(photoPositions),
+    [updatePositionsMutation]
+  )
+  const updateSettings = useCallback(
+    (settings: CollageSettings) => updateSettingsMutation.mutateAsync(settings),
+    [updateSettingsMutation]
+  )
+
   return {
     // State
     collageId: sessionId,
@@ -179,16 +210,13 @@ export function useCollageApi() {
     error,
 
     // Actions
-    initCollage: () => initMutation.mutate(),
+    initCollage,
     addPhoto: (photo: { id: string; dataUrl: string; fileName: string }) =>
       addPhotoMutation.mutateAsync(photo),
     removePhoto: (photoId: string) => removePhotoMutation.mutateAsync(photoId),
-    updateLayout: (selectedLayoutId: string | null, photoPositions: PhotoPosition[]) =>
-      updateLayoutMutation.mutateAsync({ selectedLayoutId, photoPositions }),
-    updatePositions: (photoPositions: PhotoPosition[]) =>
-      updatePositionsMutation.mutateAsync(photoPositions),
-    updateSettings: (settings: CollageSettings) =>
-      updateSettingsMutation.mutateAsync(settings),
+    updateLayout,
+    updatePositions,
+    updateSettings,
     clearAll: () => clearAllMutation.mutateAsync(),
   }
 }

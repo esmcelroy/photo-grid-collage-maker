@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useCollageApi } from '@/hooks/useCollageApi'
-import { UploadedPhoto, PhotoPosition, GridLayout } from '@/lib/types'
+import { UploadedPhoto, PhotoPosition, GridLayout, CollageSettings } from '@/lib/types'
 import { getLayoutsForPhotoCount } from '@/lib/layouts'
 import { fileToDataUrl, generateUniqueId, downloadCollage } from '@/lib/image-utils'
 import { UploadZone } from '@/components/UploadZone'
@@ -41,6 +41,7 @@ function App() {
   } = useCollageApi()
 
   const previewRef = useRef<HTMLDivElement>(null)
+  const settingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [availableLayouts, setAvailableLayouts] = useState<GridLayout[]>([])
   const [selectedLayout, setSelectedLayout] = useState<GridLayout | null>(null)
 
@@ -49,7 +50,7 @@ function App() {
     if (!collageId) {
       initCollage()
     }
-  }, [collageId])
+  }, [collageId, initCollage])
 
   useEffect(() => {
     const layouts = getLayoutsForPhotoCount(photos.length)
@@ -70,7 +71,7 @@ function App() {
     } else if (photos.length === 0) {
       setSelectedLayout(null)
     }
-  }, [photos.length])
+  }, [photos, selectedLayoutId, updateLayout])
 
   useEffect(() => {
     if (selectedLayoutId) {
@@ -98,9 +99,23 @@ function App() {
   }, [photos.length, addPhoto])
 
   const handleRemovePhoto = useCallback(async (photoId: string) => {
-    await removePhoto(photoId)
-    toast.success('Photo removed')
+    try {
+      await removePhoto(photoId)
+      toast.success('Photo removed')
+    } catch (error) {
+      toast.error('Failed to remove photo')
+      console.error(error)
+    }
   }, [removePhoto])
+
+  const handleSettingsChange = useCallback((newSettings: CollageSettings) => {
+    if (settingsTimerRef.current) clearTimeout(settingsTimerRef.current)
+    settingsTimerRef.current = setTimeout(() => {
+      void updateSettings(newSettings).catch(() => {
+        toast.error('Failed to save settings')
+      })
+    }, 300)
+  }, [updateSettings])
 
   const handleLayoutSelect = useCallback(async (layoutId: string) => {
     const layout = availableLayouts.find(l => l.id === layoutId)
@@ -217,7 +232,11 @@ function App() {
                   photos={photos}
                   photoPositions={photoPositions}
                   settings={settings}
-                  onPositionsChange={updatePositions}
+                  onPositionsChange={(nextPositions) => {
+                    void updatePositions(nextPositions).catch(() => {
+                      toast.error('Failed to update photo positions')
+                    })
+                  }}
                   previewRef={previewRef}
                 />
               </div>
@@ -229,7 +248,7 @@ function App() {
               <>
                 <CustomizationControls
                   settings={settings}
-                  onSettingsChange={updateSettings}
+                  onSettingsChange={handleSettingsChange}
                 />
 
                 <LayoutGallery
