@@ -64,13 +64,11 @@ UploadZone › calls onFilesSelected when valid images are dropped
 
 ### Current State
 
-The project currently has **ESLint only** — no test runner is installed. The planned stack is:
+The project now includes:
 
-- **Unit/Integration:** Jest + React Testing Library
+- **Unit/Integration:** Jest + React Testing Library (`jest.config.ts`, `src/__tests__/setup.ts`)
 - **API (future):** Jest + Supertest
-- **E2E:** Playwright
-
-When adding tests, install the appropriate tooling first before writing tests.
+- **E2E:** Playwright (`playwright.config.ts`, `e2e/journeys/`, `e2e/pages/`, `e2e/fixtures/`)
 
 ---
 
