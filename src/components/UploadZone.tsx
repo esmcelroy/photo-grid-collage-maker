@@ -32,7 +32,9 @@ export function UploadZone({
   }, [onFilesSelected, maxFiles, currentFileCount])
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
+    const files = Array.from(e.target.files || []).filter(file =>
+      file.type.startsWith('image/')
+    )
     const remainingSlots = maxFiles - currentFileCount
     const filesToAdd = files.slice(0, remainingSlots)
     

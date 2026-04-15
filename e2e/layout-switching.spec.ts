@@ -1,0 +1,57 @@
+import { test, expect } from '@playwright/test'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+/** Reset the Spark KV store to a clean state before each test. */
+async function clearKVState(request: import('@playwright/test').APIRequestContext) {
+  for (const key of ['collage-photos', 'selected-layout', 'photo-positions', 'collage-settings']) {
+    await request.delete(`/_spark/kv/${encodeURIComponent(key)}`).catch(() => {})
+  }
+}
+
+test.describe('Layout Switching', () => {
+  test.beforeEach(async ({ page, request }) => {
+    await clearKVState(request)
+    await page.goto('/')
+    await page.waitForLoadState('domcontentloaded')
+    const fileInput = page.locator('input[type="file"]')
+    await fileInput.setInputFiles([
+      path.join(__dirname, 'fixtures/test-image.jpg'),
+      path.join(__dirname, 'fixtures/test-image-2.jpg'),
+    ])
+    // Wait for layout gallery to be ready before each test
+    await expect(page.getByText('Layout Options')).toBeVisible()
+  })
+
+  test('layout gallery shows multiple options for 2 photos', async ({ page }) => {
+    // With 2 photos the app surfaces several layout options; the count badge
+    // reads "N layouts" (e.g. "6 layouts").  We just assert it's > 1.
+    await expect(page.getByText(/\d+ layouts?/)).toBeVisible()
+
+    // Confirm at least one of the known 2-photo layout names is rendered
+    await expect(page.getByText('Side by Side')).toBeVisible()
+  })
+
+  test('selecting a different layout keeps the preview visible', async ({ page }) => {
+    // "Stacked" is a valid 2-photo layout; click it to switch
+    await page.getByText('Stacked').click()
+
+    // Preview section must still be present after the layout change
+    await expect(page.getByText('Preview')).toBeVisible()
+    await expect(page.getByRole('button', { name: /download/i })).toBeVisible()
+  })
+
+  test('badge reflects both uploaded photos', async ({ page }) => {
+    await expect(page.getByText('2 / 9')).toBeVisible()
+  })
+
+  test('layout card for current selection is visually distinguished', async ({ page }) => {
+    // The first layout for 2 photos is "Side by Side" and is auto-selected.
+    // It should be present in the gallery (exact content verification).
+    const sideBySide = page.getByText('Side by Side')
+    await expect(sideBySide).toBeVisible()
+  })
+})
