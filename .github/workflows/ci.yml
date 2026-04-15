@@ -114,12 +114,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
       - run: npm ci
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-      - name: Run UI tests (when test:ui script exists)
+      - name: Detect UI test script
+        id: ui-test-script
         run: |
           if node -e "const p=require('./package.json'); process.exit(p.scripts && p.scripts['test:ui'] ? 0 : 1)"; then
-            npm run test:ui
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "No test:ui script found. Skipping UI test job."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+      - name: Install Playwright browsers
+        if: steps.ui-test-script.outputs.exists == 'true'
+        run: npx playwright install --with-deps
+      - name: Run UI tests
+        if: steps.ui-test-script.outputs.exists == 'true'
+        run: npm run test:ui
+      - name: Skip UI tests when test:ui script is not configured
+        if: steps.ui-test-script.outputs.exists != 'true'
+        run: echo "No test:ui script found. Skipping UI test job."
