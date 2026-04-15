@@ -27,13 +27,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
       - run: npm ci
-      - name: Run lint (when ESLint flat config exists)
+      - name: Detect lint script
+        id: lint-script
         run: |
-          if [ -f eslint.config.js ] || [ -f eslint.config.mjs ] || [ -f eslint.config.cjs ]; then
-            npm run lint
+          if node -e "const p=require('./package.json'); process.exit(p.scripts && p.scripts.lint ? 0 : 1)"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "No eslint.config.* file found. Skipping lint for now."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+      - name: Run lint
+        if: steps.lint-script.outputs.exists == 'true'
+        run: npm run lint
+      - name: Skip lint
+        if: steps.lint-script.outputs.exists != 'true'
+        run: |
+          echo "No lint script found in package.json. Skipping lint job until linting is configured."
 
   typecheck:
     runs-on: ubuntu-latest
