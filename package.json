@@ -12,7 +12,7 @@
         "test:watch": "jest --watch",
         "test:coverage": "jest --coverage",
         "test:ui": "playwright test",
-        "test:ui:install": "playwright install --with-deps chromium",
+        "test:ui:install": "playwright install --with-deps",
         "optimize": "vite optimize",
         "preview": "vite preview"
     },
