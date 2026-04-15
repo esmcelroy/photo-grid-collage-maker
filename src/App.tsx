@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useCollageApi } from '@/hooks/useCollageApi'
 import { UploadedPhoto, PhotoPosition, GridLayout, CollageSettings } from '@/lib/types'
 import { getLayoutsForPhotoCount } from '@/lib/layouts'
 import { fileToDataUrl, generateUniqueId, downloadCollage } from '@/lib/image-utils'
@@ -16,98 +16,114 @@ import { DownloadSimple, Trash, Sparkle } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 
+function initializePositions(layout: GridLayout, photosArray: UploadedPhoto[]): PhotoPosition[] {
+  return layout.areas.map((area, index) => ({
+    photoId: photosArray[index]?.id || '',
+    gridArea: area,
+  }))
+}
+
 function App() {
-  const [photos, setPhotos] = useKV<UploadedPhoto[]>('collage-photos', [])
-  const [selectedLayoutId, setSelectedLayoutId] = useKV<string | null>('selected-layout', null)
-  const [photoPositions, setPhotoPositions] = useKV<PhotoPosition[]>('photo-positions', [])
-  const [settings, setSettings] = useKV<CollageSettings>('collage-settings', {
-    gap: 8,
-    backgroundColor: 'transparent',
-    borderRadius: 0
-  })
+  const {
+    collageId,
+    photos,
+    selectedLayoutId,
+    photoPositions,
+    settings,
+    isLoading,
+    initCollage,
+    addPhoto,
+    removePhoto,
+    updateLayout,
+    updatePositions,
+    updateSettings,
+    clearAll,
+  } = useCollageApi()
 
   const previewRef = useRef<HTMLDivElement>(null)
+  const settingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [availableLayouts, setAvailableLayouts] = useState<GridLayout[]>([])
   const [selectedLayout, setSelectedLayout] = useState<GridLayout | null>(null)
 
-  const currentPhotos = photos || []
-  const currentPositions = photoPositions || []
-  const currentSettings = settings || { gap: 8, backgroundColor: 'transparent', borderRadius: 0 }
-  const currentLayoutId = selectedLayoutId || null
+  // Initialize session if none exists
+  useEffect(() => {
+    if (!collageId) {
+      initCollage()
+    }
+  }, [collageId, initCollage])
 
   useEffect(() => {
-    const layouts = getLayoutsForPhotoCount(currentPhotos.length)
+    const layouts = getLayoutsForPhotoCount(photos.length)
     setAvailableLayouts(layouts)
 
-    if (currentPhotos.length > 0 && layouts.length > 0) {
-      const currentLayoutValid = layouts.some(l => l.id === currentLayoutId)
-      
+    if (photos.length > 0 && layouts.length > 0) {
+      const currentLayoutValid = layouts.some(l => l.id === selectedLayoutId)
+
       if (!currentLayoutValid) {
         const newLayout = layouts[0]
-        setSelectedLayoutId(newLayout.id)
+        const newPositions = initializePositions(newLayout, photos)
+        updateLayout(newLayout.id, newPositions)
         setSelectedLayout(newLayout)
-        initializePhotoPositions(newLayout, currentPhotos)
       } else {
-        const layout = layouts.find(l => l.id === currentLayoutId)
+        const layout = layouts.find(l => l.id === selectedLayoutId)
         setSelectedLayout(layout || null)
       }
-    } else {
-      setSelectedLayoutId(null)
+    } else if (photos.length === 0) {
       setSelectedLayout(null)
-      setPhotoPositions([])
     }
-  }, [currentPhotos.length])
+  }, [photos, selectedLayoutId, updateLayout])
 
   useEffect(() => {
-    if (currentLayoutId) {
-      const layout = availableLayouts.find(l => l.id === currentLayoutId)
+    if (selectedLayoutId) {
+      const layout = availableLayouts.find(l => l.id === selectedLayoutId)
       setSelectedLayout(layout || null)
     }
-  }, [currentLayoutId, availableLayouts])
-
-  const initializePhotoPositions = (layout: GridLayout, photosArray: UploadedPhoto[]) => {
-    const newPositions: PhotoPosition[] = layout.areas.map((area, index) => ({
-      photoId: photosArray[index]?.id || '',
-      gridArea: area
-    }))
-    setPhotoPositions(newPositions)
-  }
+  }, [selectedLayoutId, availableLayouts])
 
   const handleFilesSelected = useCallback(async (files: File[]) => {
     try {
-      const newPhotos = await Promise.all(
-        files.map(async (file) => ({
-          id: generateUniqueId(),
-          file,
-          dataUrl: await fileToDataUrl(file)
-        }))
+      const remaining = 9 - photos.length
+      const toAdd = files.slice(0, remaining)
+      await Promise.all(
+        toAdd.map(async (file) => {
+          const dataUrl = await fileToDataUrl(file)
+          const id = generateUniqueId()
+          await addPhoto({ id, dataUrl, fileName: file.name })
+        })
       )
-
-      setPhotos((currentPhotos = []) => {
-        const updated = [...currentPhotos, ...newPhotos]
-        return updated.slice(0, 9)
-      })
-
-      toast.success(`Added ${newPhotos.length} ${newPhotos.length === 1 ? 'photo' : 'photos'}`)
+      toast.success(`Added ${toAdd.length} ${toAdd.length === 1 ? 'photo' : 'photos'}`)
     } catch (error) {
       toast.error('Failed to upload photos')
       console.error(error)
     }
-  }, [setPhotos])
+  }, [photos.length, addPhoto])
 
-  const handleRemovePhoto = useCallback((photoId: string) => {
-    setPhotos((currentPhotos = []) => currentPhotos.filter(p => p.id !== photoId))
-    toast.success('Photo removed')
-  }, [setPhotos])
+  const handleRemovePhoto = useCallback(async (photoId: string) => {
+    try {
+      await removePhoto(photoId)
+      toast.success('Photo removed')
+    } catch (error) {
+      toast.error('Failed to remove photo')
+      console.error(error)
+    }
+  }, [removePhoto])
 
-  const handleLayoutSelect = useCallback((layoutId: string) => {
+  const handleSettingsChange = useCallback((newSettings: CollageSettings) => {
+    if (settingsTimerRef.current) clearTimeout(settingsTimerRef.current)
+    settingsTimerRef.current = setTimeout(() => {
+      void updateSettings(newSettings).catch(() => {
+        toast.error('Failed to save settings')
+      })
+    }, 300)
+  }, [updateSettings])
+
+  const handleLayoutSelect = useCallback(async (layoutId: string) => {
     const layout = availableLayouts.find(l => l.id === layoutId)
     if (!layout) return
-
-    setSelectedLayoutId(layoutId)
-    initializePhotoPositions(layout, currentPhotos)
+    const newPositions = initializePositions(layout, photos)
+    await updateLayout(layoutId, newPositions)
     toast.success(`Layout changed to ${layout.name}`)
-  }, [availableLayouts, currentPhotos, setSelectedLayoutId])
+  }, [availableLayouts, photos, updateLayout])
 
   const handleDownload = async () => {
     if (!previewRef.current || !selectedLayout) {
@@ -125,11 +141,13 @@ function App() {
     }
   }
 
-  const handleClearAll = () => {
-    setPhotos([])
-    setSelectedLayoutId(null)
-    setPhotoPositions([])
+  const handleClearAll = async () => {
+    await clearAll()
     toast.success('All photos cleared')
+  }
+
+  if (isLoading && !collageId) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   }
 
   return (
@@ -154,10 +172,10 @@ function App() {
 
         <div className="grid lg:grid-cols-3 gap-6 mb-6">
           <div className="lg:col-span-2 space-y-6">
-            {currentPhotos.length === 0 ? (
+            {photos.length === 0 ? (
               <UploadZone 
                 onFilesSelected={handleFilesSelected}
-                currentFileCount={currentPhotos.length}
+                currentFileCount={photos.length}
               />
             ) : (
               <Card className="p-6">
@@ -165,7 +183,7 @@ function App() {
                   <div className="flex items-center gap-2">
                     <h3 className="text-lg font-semibold">Your Photos</h3>
                     <Badge variant="secondary">
-                      {currentPhotos.length} / 9
+                      {photos.length} / 9
                     </Badge>
                   </div>
                   <Button
@@ -180,7 +198,7 @@ function App() {
 
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 mb-4">
                   <AnimatePresence>
-                    {currentPhotos.map((photo, index) => (
+                    {photos.map((photo, index) => (
                       <PhotoThumbnail
                         key={photo.id}
                         photo={photo}
@@ -191,10 +209,10 @@ function App() {
                   </AnimatePresence>
                 </div>
 
-                {currentPhotos.length < 9 && (
+                {photos.length < 9 && (
                   <UploadZone 
                     onFilesSelected={handleFilesSelected}
-                    currentFileCount={currentPhotos.length}
+                    currentFileCount={photos.length}
                   />
                 )}
               </Card>
@@ -211,10 +229,14 @@ function App() {
                 </div>
                 <CollagePreview
                   layout={selectedLayout}
-                  photos={currentPhotos}
-                  photoPositions={currentPositions}
-                  settings={currentSettings}
-                  onPositionsChange={setPhotoPositions}
+                  photos={photos}
+                  photoPositions={photoPositions}
+                  settings={settings}
+                  onPositionsChange={(nextPositions) => {
+                    void updatePositions(nextPositions).catch(() => {
+                      toast.error('Failed to update photo positions')
+                    })
+                  }}
                   previewRef={previewRef}
                 />
               </div>
@@ -222,18 +244,18 @@ function App() {
           </div>
 
           <div className="space-y-6">
-            {currentPhotos.length > 0 && (
+            {photos.length > 0 && (
               <>
                 <CustomizationControls
-                  settings={currentSettings}
-                  onSettingsChange={setSettings}
+                  settings={settings}
+                  onSettingsChange={handleSettingsChange}
                 />
 
                 <LayoutGallery
                   layouts={availableLayouts}
-                  photos={currentPhotos}
-                  photoPositions={currentPositions}
-                  selectedLayoutId={currentLayoutId}
+                  photos={photos}
+                  photoPositions={photoPositions}
+                  selectedLayoutId={selectedLayoutId}
                   onLayoutSelect={handleLayoutSelect}
                 />
               </>
@@ -241,7 +263,7 @@ function App() {
           </div>
         </div>
 
-        {currentPhotos.length === 0 && (
+        {photos.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

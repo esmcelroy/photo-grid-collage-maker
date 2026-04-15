@@ -34,3 +34,9 @@ pids
 .spark-workbench-id
 coverage/
 test-results/
+collage.db
+collage.db-shm
+collage.db-wal
+todos.db
+todos.db-shm
+todos.db-wal

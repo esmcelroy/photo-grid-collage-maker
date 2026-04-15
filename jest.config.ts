@@ -13,8 +13,8 @@ const config: Config = {
     '**/*.test.ts',
     '**/*.test.tsx',
   ],
-  // Belt-and-suspenders: keep e2e/ and node_modules out of Jest
-  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/e2e/'],
+  // Belt-and-suspenders: keep e2e/, server/, and node_modules out of Jest
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/e2e/', '<rootDir>/server/'],
   coverageThreshold: {
     global: {
       branches: 80,
