@@ -46,7 +46,7 @@ GitHub CLI commands for workflow automation (available to all modes):
 - Get issue with comments: `gh issue view <issue-number> --comments`
 - The main exercise issue will have "Exercise:" in the title
 - Steps are posted as comments on the main issue
-- Use these commands when /execute-step or /validate-step prompts are invoked
+- Use these commands when /opsx:issue, /execute-step, or /validate-step prompts are invoked
 
 ## Git Workflow
 - Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, etc.

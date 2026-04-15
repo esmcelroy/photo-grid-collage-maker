@@ -187,3 +187,33 @@ Update `.github/memory/scratch/working-notes.md` with findings as you go.
 | `test:` | Adding or fixing tests |
 | `refactor:` | Refactoring without behavior change |
 | `style:` | Formatting only (rare) |
+
+---
+
+## 8. OpenSpec + GitHub Issue Workflow
+
+OpenSpec is configured for GitHub Copilot in this repository.
+
+### OpenSpec Commands
+
+- `/opsx:propose <idea>`: Create a change in `openspec/changes/` and generate proposal, specs, design, and tasks artifacts.
+- `/opsx:issue <issue-number> <step-number>`: Sync a GitHub issue step into OpenSpec artifacts before implementation.
+- `/opsx:explore <change-name>`: Review and refine artifacts before implementation.
+- `/opsx:apply`: Execute tasks from the active OpenSpec change.
+- `/opsx:archive`: Archive a completed change and merge approved delta specs into `openspec/specs/`.
+
+### Recommended Combined Flow
+
+1. Pick the current issue step (`gh issue view <issue-number> --comments`)
+2. Create or sync OpenSpec artifacts from the issue step with `/opsx:issue <issue-number> <step-number>`
+3. Refine proposals/design as needed with `/opsx:propose` or `/opsx:explore`
+4. Execute code work with `/execute-step` (TDD-first)
+5. Validate success criteria with `/validate-step <step-number>`
+6. If complete, archive spec deltas with `/opsx:archive`
+7. Commit and push with `/commit-and-push <branch-name>`
+
+### Notes
+
+- Use OpenSpec to track intent and requirements deltas.
+- Use issue steps as the source of sequencing and acceptance checks.
+- Keep Playwright authoring/runs in the `test-engineer` flow as documented above.
