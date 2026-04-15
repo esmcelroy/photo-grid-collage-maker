@@ -23,9 +23,11 @@ A browser-based photo collage maker. Users upload 1–9 photos, choose from dyna
 | Animations | Framer Motion |
 | Icons | `@phosphor-icons/react` |
 | PNG Export | html2canvas |
-| Data Fetching | `@tanstack/react-query` (available, not yet used heavily) |
+| Data Fetching | `@tanstack/react-query` — `useCollageApi` hook |
 | Notifications | sonner (toast) |
-| State | `@github/spark` `useKV` hook (KV store) |
+| State | REST API + SQLite via `useCollageApi` hook |
+| Backend | Express.js + TypeScript (`server/`) |
+| Database | SQLite via `better-sqlite3` |
 
 ---
 
@@ -33,8 +35,8 @@ A browser-based photo collage maker. Users upload 1–9 photos, choose from dyna
 
 ```
 src/
-├── App.tsx                     # Root component; owns all state via useKV
-├── main.tsx                    # React entry point
+├── App.tsx                     # Root component; uses useCollageApi for all state
+├── main.tsx                    # React entry point; QueryClientProvider wrapper
 ├── components/
 │   ├── UploadZone.tsx          # Drag-and-drop + file picker (max 9 photos)
 │   ├── PhotoThumbnail.tsx      # Thumbnail with remove button (Framer Motion)
@@ -49,7 +51,19 @@ src/
 │   ├── image-utils.ts          # fileToDataUrl, generateUniqueId, downloadCollage
 │   └── utils.ts                # cn() Tailwind merge helper
 └── hooks/
+    ├── useCollageApi.ts        # React Query hook — all API calls + state
     └── use-mobile.ts           # Responsive breakpoint detection
+
+server/
+├── index.ts                    # Express app entry point (port 3001)
+├── db.ts                       # SQLite singleton + schema migrations
+├── types.ts                    # Serializable API types (ApiPhoto, CollageState)
+├── routes/
+│   └── collages.ts             # All 5 REST routes
+├── tsconfig.json               # CommonJS TypeScript config for server
+├── jest.config.js              # Separate Jest config for server tests
+└── __tests__/
+    └── collages.test.ts        # 20 Supertest integration tests
 ```
 
 ---
@@ -57,7 +71,7 @@ src/
 ## Component Dependency Diagram
 
 ```
-App.tsx  (state owner — 4 useKV keys)
+App.tsx  (state owner — useCollageApi hook)
 │
 ├── UploadZone.tsx
 │       └── PhotoThumbnail.tsx
@@ -92,22 +106,19 @@ CollageState      // photos, selectedLayoutId, photoPositions, settings
 
 ---
 
-## State Management (`App.tsx`)
+## State Management (`src/hooks/useCollageApi.ts`)
 
-State is held in four `@github/spark` `useKV` keys:
+State is managed via a React Query hook that communicates with the Express backend. A collage session ID is stored in `localStorage` and created on first load.
 
-| Key | Type | Description |
+| Domain | API Call | React Query key |
 |---|---|---|
-| `'collage-photos'` | `UploadedPhoto[]` | All uploaded photos |
-| `'selected-layout'` | `string \| null` | ID of the active layout |
-| `'photo-positions'` | `PhotoPosition[]` | Photo-to-grid-area assignments |
-| `'collage-settings'` | `CollageSettings` | Gap, border-radius, background color |
+| All state | `GET /api/collages/:id` | `['collage', sessionId]` |
+| Add photo | `POST /api/collages/:id/photos` | invalidates query |
+| Remove photo | `DELETE /api/collages/:id/photos/:photoId` | invalidates query |
+| Update layout/positions | `PATCH /api/collages/:id` | sets query data directly |
+| Update settings | `PATCH /api/collages/:id` | sets query data directly |
 
-**Defensive access pattern** used throughout (KV values may be `undefined` on first load):
-
-```ts
-const currentPhotos = photos || [];
-```
+The hook exposes clean defaults (empty arrays, null, fallback settings) before the session loads — no defensive `|| []` patterns needed in components.
 
 ---
 
@@ -118,13 +129,13 @@ const currentPhotos = photos || [];
    User drops files
      → handleFilesSelected()
      → fileToDataUrl() converts each File to a base64 dataUrl
-     → stored in 'collage-photos' KV key
+     → POST /api/collages/:id/photos for each file
 
 2. Layout selection
    Photo count changes
      → getLayoutsForPhotoCount(n) recalculates available layouts
      → first matching layout auto-selected
-     → initializePhotoPositions() maps each photo to a named grid area
+     → PATCH /api/collages/:id with { selectedLayoutId, photoPositions }
 
 3. Preview render
    CollagePreview reads photoPositions + selectedLayout
@@ -133,6 +144,7 @@ const currentPhotos = photos || [];
 
 4. Customization
    CustomizationControls updates CollageSettings
+     → PATCH /api/collages/:id with { settings }
      → gap, borderRadius, backgroundColor applied inline to the grid
 
 5. Export
@@ -162,17 +174,30 @@ Layouts are defined as static objects in the `GRID_LAYOUTS` array:
 
 ---
 
-## Planned Architecture (Backend Hardening Phase)
+## Backend API (`server/`)
 
-The current `useKV` state layer is a planned migration target:
+Express.js + TypeScript server on port 3001. SQLite database via `better-sqlite3`.
 
-| Concern | Current | Planned |
+### Routes
+
+| Method | Path | Description |
 |---|---|---|
-| Photo storage | base64 dataUrls in KV | Server-side (S3 or similar) |
-| Collage state | `useKV` browser KV | REST API + database |
-| State access | `@github/spark` hooks | Standard `fetch` / React Query |
+| `POST` | `/api/collages` | Create new collage session → `{ id }` |
+| `GET` | `/api/collages/:id` | Get full collage state |
+| `PATCH` | `/api/collages/:id` | Update layout, positions, or settings |
+| `POST` | `/api/collages/:id/photos` | Add a photo (base64 JSON body) |
+| `DELETE` | `/api/collages/:id/photos/:photoId` | Remove a photo |
 
-**Frontend components are designed to remain unchanged** — only the state/data layer will be swapped out.
+### Schema
+
+```sql
+collages(id, selected_layout_id, settings_json, created_at, updated_at)
+photos(id, collage_id, data_url, file_name, created_at)
+photo_positions(collage_id, photo_id, grid_area)
+```
+
+Start the backend: `npm run server:dev`  
+Run API tests: `cd server && npx jest`
 
 ---
 
