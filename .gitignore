@@ -32,3 +32,5 @@ pids
 .devcontainer/
 
 .spark-workbench-id
+coverage/
+test-results/
