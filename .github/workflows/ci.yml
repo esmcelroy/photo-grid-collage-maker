@@ -8,6 +8,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -20,7 +23,6 @@ jobs:
         with:
           path: |
             ~/.npm
-            node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
@@ -44,7 +46,6 @@ jobs:
         with:
           path: |
             ~/.npm
-            node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
@@ -62,19 +63,27 @@ jobs:
         with:
           path: |
             ~/.npm
-            node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
       - run: npm ci
-      - name: Run unit tests (when test script exists)
+      - name: Detect test script
+        id: test-script
         run: |
           if node -e "const p=require('./package.json'); process.exit(p.scripts && p.scripts.test ? 0 : 1)"; then
-            npm test -- --ci --coverage
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "No test script found. Skipping test job until testing infrastructure is added."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+      - name: Run unit tests
+        if: steps.test-script.outputs.exists == 'true'
+        run: npm test -- --ci --coverage
+      - name: Skip unit tests
+        if: steps.test-script.outputs.exists != 'true'
+        run: |
+          echo "No test script found. Skipping test job until testing infrastructure is added."
       - name: Upload coverage artifact
+        if: steps.test-script.outputs.exists == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: coverage
@@ -93,7 +102,6 @@ jobs:
         with:
           path: |
             ~/.npm
-            node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
