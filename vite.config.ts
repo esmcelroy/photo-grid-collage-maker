@@ -8,6 +8,7 @@ import createIconImportProxy from "@github/spark/vitePhosphorIconProxyPlugin";
 import { resolve } from 'path'
 
 const projectRoot = process.env.PROJECT_ROOT || import.meta.dirname
+const isProduction = process.env.GITHUB_PAGES === 'true' || process.env.NODE_ENV === 'production'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -15,9 +16,10 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    // DO NOT REMOVE
+    // DO NOT REMOVE — required by Spark development environment
     createIconImportProxy() as PluginOption,
-    sparkPlugin({ port: 5173 }) as PluginOption,
+    // Only load Spark plugin in development (causes 405 errors in production)
+    ...(!isProduction ? [sparkPlugin({ port: 5173 }) as PluginOption] : []),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico'],
