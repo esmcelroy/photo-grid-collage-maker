@@ -146,19 +146,23 @@ export function replaceOklchInSubtree(root: HTMLElement): () => void {
 /* istanbul ignore next -- html2canvas requires a real browser; covered by Playwright e2e */
 export async function downloadCollage(
   canvasElement: HTMLElement,
-  filename: string = 'collage.png'
+  filename: string = 'collage.png',
+  format: 'png' | 'jpeg' = 'png',
+  quality: number = 1.0
 ): Promise<void> {
   const html2canvas = (await import('html2canvas')).default
 
   // Convert oklch/oklab colors before html2canvas processes the DOM
   const restore = replaceOklchInSubtree(canvasElement)
 
+  const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png'
+
   try {
     const canvas = await html2canvas(canvasElement, {
       scale: 3,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: null,
+      backgroundColor: format === 'jpeg' ? '#ffffff' : null,
       logging: false,
       onclone: (clonedDoc: Document, clonedEl: HTMLElement) => {
         // html2canvas clones the entire document — convert CSS custom
@@ -195,7 +199,7 @@ export async function downloadCollage(
       link.click()
 
       URL.revokeObjectURL(url)
-    }, 'image/png', 1.0)
+    }, mimeType, quality)
   } finally {
     restore()
   }
