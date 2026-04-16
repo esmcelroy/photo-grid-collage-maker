@@ -8,6 +8,8 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/src/$1',
     // lucide-react is ESM-only; mock all icons used by shadcn components
     'lucide-react/dist/esm/icons/(.*)': '<rootDir>/src/__tests__/__mocks__/lucide-icon.tsx',
+    // libheif-js uses WASM which can't run in jsdom
+    'libheif-js': '<rootDir>/src/__tests__/__mocks__/libheif-js.ts',
   },
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
   // Only match *.test.ts / *.test.tsx — excludes setup files and Playwright .spec.ts
@@ -32,6 +34,7 @@ const config: Config = {
     '!src/App.tsx',          // Integration component — covered by Playwright E2E tests
     '!src/ErrorFallback.tsx', // Uses import.meta.env (Vite-only API); not testable in Jest
     '!src/lib/db.ts',        // Dexie/IndexedDB layer — covered by Playwright E2E tests
+    '!src/lib/heic-utils.ts', // WASM-dependent — canvas/libheif mocked in tests
     '!src/components/ui/**',
     '!src/vite-end.d.ts',
     '!src/index.css',

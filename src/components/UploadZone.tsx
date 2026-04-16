@@ -2,6 +2,14 @@ import { useCallback, useState } from 'react'
 import { UploadSimple, Image as ImageIcon } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
+const HEIC_EXTENSIONS = ['.heic', '.heif']
+
+function isImageOrHeic(file: File): boolean {
+  if (file.type.startsWith('image/')) return true
+  const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+  return HEIC_EXTENSIONS.includes(ext)
+}
+
 interface UploadZoneProps {
   onFilesSelected: (files: File[]) => void
   maxFiles?: number
@@ -19,9 +27,7 @@ export function UploadZone({
     e.preventDefault()
     setIsDragging(false)
     
-    const files = Array.from(e.dataTransfer.files).filter(file => 
-      file.type.startsWith('image/')
-    )
+    const files = Array.from(e.dataTransfer.files).filter(isImageOrHeic)
     
     const remainingSlots = maxFiles - currentFileCount
     const filesToAdd = files.slice(0, remainingSlots)
@@ -32,9 +38,7 @@ export function UploadZone({
   }, [onFilesSelected, maxFiles, currentFileCount])
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).filter(file =>
-      file.type.startsWith('image/')
-    )
+    const files = Array.from(e.target.files || []).filter(isImageOrHeic)
     const remainingSlots = maxFiles - currentFileCount
     const filesToAdd = files.slice(0, remainingSlots)
     
@@ -68,7 +72,7 @@ export function UploadZone({
         type="file"
         id="photo-upload"
         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/heic,image/heif,.heic,.heif"
         multiple
         onChange={handleFileInput}
         disabled={isMaxed}

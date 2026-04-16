@@ -3,6 +3,7 @@ import { useCollageApi } from '@/hooks/useCollageApi'
 import { UploadedPhoto, PhotoPosition, GridLayout, CollageSettings, ExportOptions } from '@/lib/types'
 import { getLayoutsForPhotoCount, getUniqueAreaNames } from '@/lib/layouts'
 import { fileToDataUrl, generateUniqueId, downloadCollage } from '@/lib/image-utils'
+import { processFilesForHeic } from '@/lib/heic-utils'
 import { UploadZone } from '@/components/UploadZone'
 import { PhotoThumbnail } from '@/components/PhotoThumbnail'
 import { LayoutGallery } from '@/components/LayoutGallery'
@@ -89,14 +90,28 @@ function App() {
     try {
       const remaining = 9 - photos.length
       const toAdd = files.slice(0, remaining)
+
+      // Convert any HEIC/HEIF files to JPEG
+      const toastId = toast.loading('Processing photos...')
+      const { converted, errors } = await processFilesForHeic(toAdd, (done, total) => {
+        toast.loading(`Converting HEIC ${done}/${total}...`, { id: toastId })
+      })
+      toast.dismiss(toastId)
+
+      if (errors.length > 0) {
+        errors.forEach(({ fileName, error }) =>
+          toast.error(`Could not convert ${fileName}: ${error}`)
+        )
+      }
+
       await Promise.all(
-        toAdd.map(async (file) => {
+        converted.map(async (file) => {
           const dataUrl = await fileToDataUrl(file)
           const id = generateUniqueId()
           await addPhoto({ id, dataUrl, fileName: file.name })
         })
       )
-      toast.success(`Added ${toAdd.length} ${toAdd.length === 1 ? 'photo' : 'photos'}`)
+      toast.success(`Added ${converted.length} ${converted.length === 1 ? 'photo' : 'photos'}`)
     } catch (error) {
       toast.error('Failed to upload photos')
       console.error(error)
