@@ -31,7 +31,7 @@ test.describe('Layout Switching', () => {
   })
 
   test('badge reflects both uploaded photos', async ({ page }) => {
-    await expect(page.getByText('2 / 9')).toBeVisible()
+    await expect(page.getByText('2 / 16')).toBeVisible()
   })
 
   test('layout card for current selection is visually distinguished', async ({ page }) => {

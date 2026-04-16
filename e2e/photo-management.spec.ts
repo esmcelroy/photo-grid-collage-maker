@@ -37,7 +37,7 @@ test.describe('Photo Management', () => {
     await expect(page.getByText('Preview')).not.toBeVisible()
   })
 
-  test('uploading two photos shows count badge 2 / 9', async ({ page }) => {
+  test('uploading two photos shows count badge 2 / 16', async ({ page }) => {
     await app.uploadViaFileChooser(['test-image.jpg', 'test-image-2.jpg'])
     await app.assertPhotoCountBadge(2)
   })

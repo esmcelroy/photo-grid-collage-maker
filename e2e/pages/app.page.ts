@@ -154,19 +154,19 @@ export class AppPage {
    * @param count - Expected number of uploaded photos
    */
   async assertPhotoCountBadge(count: number) {
-    const badge = `${count} / 9`
+    const badge = `${count} / 16`
     await expect(this.page.getByText(badge)).toBeVisible()
   }
 
   /**
-   * Assert that upload above the 9-photo limit is rejected.
-   * At capacity (9/9), the upload zone is hidden and replaced by the photo grid.
+   * Assert that upload above the 16-photo limit is rejected.
+   * At capacity (16/16), the upload zone is hidden and replaced by the photo grid.
    */
   async assertUploadLimitEnforced() {
-    // At 9 photos, the upload zone should not be visible
+    // At 16 photos, the upload zone should not be visible
     await expect(this.page.getByText('Upload Photos')).not.toBeVisible()
-    // The photo count badge should show 9/9
-    await this.assertPhotoCountBadge(9)
+    // The photo count badge should show 16/16
+    await this.assertPhotoCountBadge(16)
   }
 
   /**
@@ -184,12 +184,12 @@ export class AppPage {
    */
   async getCurrentPhotoCount(): Promise<number | null> {
     const badgeText = await this.page
-      .getByText(/\d+ \/ 9/)
+      .getByText(/\d+ \/ \d+/)
       .textContent()
       .catch(() => null)
     
     if (!badgeText) return null
-    const match = badgeText.match(/(\d+) \/ 9/)
+    const match = badgeText.match(/(\d+) \/ \d+/)
     return match ? parseInt(match[1], 10) : null
   }
 
