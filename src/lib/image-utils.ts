@@ -12,9 +12,10 @@ export function generateUniqueId(): string {
 }
 
 /**
- * Converts oklch() / oklab() values in a CSS string to rgb() equivalents
- * using a temporary DOM element and the browser's computed style engine.
- * Falls back to the original value if the browser can't parse it (e.g. jsdom).
+ * Converts oklch() / oklab() values in a CSS string to rgb() equivalents.
+ * Uses a 1×1 canvas to force the browser to rasterize the color, which
+ * always produces sRGB pixel data regardless of input color space.
+ * Falls back to the original value if conversion fails (e.g. jsdom).
  */
 export function convertModernColors(value: string): string {
   if (!value || (!value.includes('oklch') && !value.includes('oklab'))) {
@@ -22,17 +23,24 @@ export function convertModernColors(value: string): string {
   }
 
   try {
-    const el = document.createElement('div')
-    el.style.color = value
-    document.body.appendChild(el)
-    const computed = getComputedStyle(el).color
-    document.body.removeChild(el)
-    // If the browser understood the color, computed will be in rgb() format
-    if (computed && !computed.includes('oklch') && !computed.includes('oklab')) {
-      return computed
+    const canvas = document.createElement('canvas')
+    canvas.width = 1
+    canvas.height = 1
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return value
+
+    // Clear to transparent then fill with the color
+    ctx.clearRect(0, 0, 1, 1)
+    ctx.fillStyle = value
+    ctx.fillRect(0, 0, 1, 1)
+    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data
+
+    if (a === 255) {
+      return `rgb(${r}, ${g}, ${b})`
     }
+    return `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`
   } catch {
-    // ignore — fall through to original value
+    // ignore — fall through to original value (e.g. jsdom has no canvas)
   }
   return value
 }
