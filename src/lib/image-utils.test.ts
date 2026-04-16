@@ -6,7 +6,14 @@
  * That behaviour is better validated in E2E tests owned by the test-engineer agent.
  */
 
-import { generateUniqueId, parseGridTemplate, parseGridAreas, fileToDataUrl } from '@/lib/image-utils'
+import {
+  generateUniqueId,
+  parseGridTemplate,
+  parseGridAreas,
+  fileToDataUrl,
+  convertModernColors,
+  replaceOklchInSubtree,
+} from '@/lib/image-utils'
 
 // ---------------------------------------------------------------------------
 // generateUniqueId
@@ -228,5 +235,90 @@ describe('fileToDataUrl', () => {
     const pngFile = new File(['png-bytes'], 'image.png', { type: 'image/png' })
     const result = await fileToDataUrl(pngFile)
     expect(result).toMatch(/^data:image\/png;base64,/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// convertModernColors
+// ---------------------------------------------------------------------------
+
+describe('convertModernColors', () => {
+  it('returns empty string unchanged', () => {
+    expect(convertModernColors('')).toBe('')
+  })
+
+  it('returns non-oklch values unchanged', () => {
+    expect(convertModernColors('#ff0000')).toBe('#ff0000')
+    expect(convertModernColors('rgb(255, 0, 0)')).toBe('rgb(255, 0, 0)')
+    expect(convertModernColors('blue')).toBe('blue')
+  })
+
+  it('does not throw for oklch values', () => {
+    expect(() => convertModernColors('oklch(0.60 0.20 300)')).not.toThrow()
+  })
+
+  it('does not throw for oklab values', () => {
+    expect(() => convertModernColors('oklab(0.5 0.1 -0.1)')).not.toThrow()
+  })
+
+  it('returns a non-empty string for oklch input', () => {
+    const result = convertModernColors('oklch(0.60 0.20 300)')
+    expect(typeof result).toBe('string')
+    expect(result.length).toBeGreaterThan(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// replaceOklchInSubtree
+// ---------------------------------------------------------------------------
+
+describe('replaceOklchInSubtree', () => {
+  it('returns a restore function', () => {
+    const el = document.createElement('div')
+    const restore = replaceOklchInSubtree(el)
+    expect(typeof restore).toBe('function')
+    restore()
+  })
+
+  it('processes elements with oklch in style attribute', () => {
+    const el = document.createElement('div')
+    el.setAttribute('style', 'border-color: oklch(0.60 0.20 300);')
+    document.body.appendChild(el)
+
+    const restore = replaceOklchInSubtree(el)
+    // convertModernColors was called on the oklch value
+    expect(typeof restore).toBe('function')
+
+    // Restore brings back the original
+    restore()
+    expect(el.getAttribute('style')).toContain('oklch')
+
+    document.body.removeChild(el)
+  })
+
+  it('processes child elements too', () => {
+    const parent = document.createElement('div')
+    const child = document.createElement('span')
+    child.setAttribute('style', 'color: oklch(0.50 0.10 200);')
+    parent.appendChild(child)
+    document.body.appendChild(parent)
+
+    const restore = replaceOklchInSubtree(parent)
+    expect(typeof restore).toBe('function')
+
+    restore()
+    expect(child.getAttribute('style')).toContain('oklch')
+
+    document.body.removeChild(parent)
+  })
+
+  it('does not modify elements without oklch values', () => {
+    const el = document.createElement('div')
+    el.setAttribute('style', 'background-color: #ff0000;')
+    const originalStyle = el.getAttribute('style')
+
+    const restore = replaceOklchInSubtree(el)
+    expect(el.getAttribute('style')).toBe(originalStyle)
+    restore()
   })
 })

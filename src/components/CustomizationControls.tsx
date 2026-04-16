@@ -88,8 +88,8 @@ export function CustomizationControls({
                 style={{
                   backgroundColor: color.value === 'transparent' ? '#FFFFFF' : color.value,
                   borderColor: settings.backgroundColor === color.value 
-                    ? 'oklch(0.60 0.20 300)' 
-                    : 'oklch(0.88 0.02 310)'
+                    ? '#7c3aed' 
+                    : '#d4d0dc'
                 }}
                 title={color.name}
               >
