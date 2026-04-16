@@ -39,10 +39,12 @@ const makePositions = (): PhotoPosition[] => [
 
 function renderPreview(overrides?: {
   onPositionsChange?: jest.Mock
+  onEditPhoto?: jest.Mock
   positions?: PhotoPosition[]
   photosOverride?: UploadedPhoto[]
 }) {
   const onPositionsChange = overrides?.onPositionsChange ?? jest.fn()
+  const onEditPhoto = overrides?.onEditPhoto
   const result = render(
     <CollagePreview
       layout={layout}
@@ -50,9 +52,10 @@ function renderPreview(overrides?: {
       photoPositions={overrides?.positions ?? makePositions()}
       settings={settings}
       onPositionsChange={onPositionsChange}
+      onEditPhoto={onEditPhoto}
     />
   )
-  return { ...result, onPositionsChange }
+  return { ...result, onPositionsChange, onEditPhoto }
 }
 
 // ─── tests ───────────────────────────────────────────────────────────────────
@@ -346,5 +349,62 @@ describe('CollagePreview', () => {
       { photoId: 'p1', gridArea: 'b' },
       { photoId: 'p3', gridArea: 'c' }, // unchanged
     ])
+  })
+
+  // ─── edit button ────────────────────────────────────────────────────────
+
+  describe('edit button', () => {
+    it('renders edit buttons when onEditPhoto is provided', () => {
+      const { container } = renderPreview({ onEditPhoto: jest.fn() })
+      const editButtons = container.querySelectorAll('[aria-label^="Edit photo"]')
+      expect(editButtons).toHaveLength(2) // one per photo slot
+    })
+
+    it('does not render edit buttons when onEditPhoto is not provided', () => {
+      const { container } = renderPreview()
+      const editButtons = container.querySelectorAll('[aria-label^="Edit photo"]')
+      expect(editButtons).toHaveLength(0)
+    })
+
+    it('calls onEditPhoto with the area when edit button is clicked', () => {
+      const onEditPhoto = jest.fn()
+      const { container } = renderPreview({ onEditPhoto })
+      const editButton = container.querySelector('[aria-label="Edit photo in slot a"]') as HTMLElement
+      fireEvent.click(editButton)
+      expect(onEditPhoto).toHaveBeenCalledWith('a')
+    })
+
+    it('does not trigger slot click when edit button is clicked', () => {
+      const onEditPhoto = jest.fn()
+      const onPositionsChange = jest.fn()
+      const { container } = renderPreview({ onEditPhoto, onPositionsChange })
+      const editButton = container.querySelector('[aria-label="Edit photo in slot a"]') as HTMLElement
+      fireEvent.click(editButton)
+      // Edit was called, but no position swap occurred
+      expect(onEditPhoto).toHaveBeenCalledWith('a')
+      expect(onPositionsChange).not.toHaveBeenCalled()
+    })
+  })
+
+  // ─── photo transforms ──────────────────────────────────────────────────
+
+  it('applies rotation and scale transforms from position data', () => {
+    const positions: PhotoPosition[] = [
+      { photoId: 'p1', gridArea: 'a', rotation: 90, scale: 1.5 },
+      { photoId: 'p2', gridArea: 'b' },
+    ]
+    const { container } = renderPreview({ positions })
+    const imgs = container.querySelectorAll('img')
+    expect((imgs[0] as HTMLImageElement).style.transform).toBe('rotate(90deg) scale(1.5)')
+  })
+
+  it('applies objectPosition from position data', () => {
+    const positions: PhotoPosition[] = [
+      { photoId: 'p1', gridArea: 'a', objectPosition: '30% 70%' },
+      { photoId: 'p2', gridArea: 'b' },
+    ]
+    const { container } = renderPreview({ positions })
+    const imgs = container.querySelectorAll('img')
+    expect((imgs[0] as HTMLImageElement).style.objectPosition).toBe('30% 70%')
   })
 })

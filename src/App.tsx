@@ -9,6 +9,7 @@ import { LayoutGallery } from '@/components/LayoutGallery'
 import { CollagePreview } from '@/components/CollagePreview'
 import { CustomizationControls } from '@/components/CustomizationControls'
 import { ExportDialog } from '@/components/ExportDialog'
+import { PhotoEditDialog } from '@/components/PhotoEditDialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -42,6 +43,7 @@ function App() {
   } = useCollageApi()
 
   const previewRef = useRef<HTMLDivElement>(null)
+  const [editingArea, setEditingArea] = useState<string | null>(null)
   const settingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [availableLayouts, setAvailableLayouts] = useState<GridLayout[]>([])
   const [selectedLayout, setSelectedLayout] = useState<GridLayout | null>(null)
@@ -154,6 +156,30 @@ function App() {
     toast.success('All photos cleared')
   }
 
+  const handleEditPhoto = (area: string) => {
+    setEditingArea(area)
+  }
+
+  const handleApplyEdit = async (updatedPosition: PhotoPosition) => {
+    const newPositions = photoPositions.map(p =>
+      p.gridArea === updatedPosition.gridArea ? updatedPosition : p
+    )
+    try {
+      await updatePositions(newPositions)
+    } catch {
+      toast.error('Failed to save photo edits')
+    }
+  }
+
+  // Derived state for edit dialog
+  const editingPosition = editingArea
+    ? photoPositions.find(p => p.gridArea === editingArea)
+    : undefined
+  const editingPhotoId = editingPosition?.photoId
+  const editingPhoto = editingPhotoId
+    ? photos.find(p => p.id === editingPhotoId)
+    : undefined
+
   if (isLoading && !collageId) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   }
@@ -245,6 +271,7 @@ function App() {
                       toast.error('Failed to update photo positions')
                     })
                   }}
+                  onEditPhoto={handleEditPhoto}
                   previewRef={previewRef}
                 />
               </div>
@@ -288,6 +315,16 @@ function App() {
           </motion.div>
         )}
       </div>
+
+      {editingPhoto && editingPosition && (
+        <PhotoEditDialog
+          open={!!editingArea}
+          onOpenChange={(open) => { if (!open) setEditingArea(null) }}
+          photo={editingPhoto}
+          position={editingPosition}
+          onApply={handleApplyEdit}
+        />
+      )}
     </div>
   )
 }

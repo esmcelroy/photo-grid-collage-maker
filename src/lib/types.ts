@@ -7,6 +7,9 @@ export interface UploadedPhoto {
 export interface PhotoPosition {
   photoId: string
   gridArea: string
+  objectPosition?: string // CSS object-position, e.g. '30% 60%'
+  rotation?: number       // degrees (0, 90, 180, 270 for steps; -45 to 45 for fine)
+  scale?: number          // 1.0 = fit, >1.0 = zoomed in
 }
 
 export interface GridLayout {
