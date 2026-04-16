@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { UploadedPhoto, PhotoPosition, CollageSettings } from '@/lib/types'
 
@@ -107,6 +107,11 @@ function apiPhotoToUploadedPhoto(apiPhoto: ApiPhoto): UploadedPhoto {
   return { id: apiPhoto.id, file, dataUrl: apiPhoto.dataUrl }
 }
 
+// Stable default values — never create new references on every render
+const EMPTY_PHOTOS: UploadedPhoto[] = []
+const EMPTY_POSITIONS: PhotoPosition[] = []
+const DEFAULT_SETTINGS: CollageSettings = { gap: 8, backgroundColor: 'transparent', borderRadius: 0 }
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -115,7 +120,7 @@ export function useCollageApi() {
   const queryClient = useQueryClient()
 
   const sessionId = getSessionId()
-  const queryKey = ['collage', sessionId]
+  const queryKey = useMemo(() => ['collage', sessionId], [sessionId])
 
   const {
     data: collageState,
@@ -128,20 +133,30 @@ export function useCollageApi() {
     staleTime: 0,
   })
 
-  // Initialize a new collage session if no ID exists
+  // Stable refs so mutation callbacks always read current values without
+  // needing to be listed as dependencies (avoids render-cycle cascades).
+  const sessionIdRef = useRef(sessionId)
+  sessionIdRef.current = sessionId
+
+  const queryKeyRef = useRef(queryKey)
+  queryKeyRef.current = queryKey
+
+  const queryClientRef = useRef(queryClient)
+  queryClientRef.current = queryClient
+
   const initMutation = useMutation({
     mutationFn: createCollage,
     onSuccess: (data) => {
       setSessionId(data.id)
-      queryClient.invalidateQueries({ queryKey: ['collage'] })
+      queryClientRef.current.invalidateQueries({ queryKey: ['collage'] })
     },
   })
 
   const addPhotoMutation = useMutation({
     mutationFn: (photo: { id: string; dataUrl: string; fileName: string }) =>
-      addPhotoRequest(sessionId!, photo),
+      addPhotoRequest(sessionIdRef.current!, photo),
     onSuccess: (apiPhoto) => {
-      queryClient.setQueryData<CollageApiState | undefined>(queryKey, (current) => {
+      queryClientRef.current.setQueryData<CollageApiState | undefined>(queryKeyRef.current, (current) => {
         if (!current) return current
         return {
           ...current,
@@ -152,26 +167,26 @@ export function useCollageApi() {
   })
 
   const removePhotoMutation = useMutation({
-    mutationFn: (photoId: string) => removePhotoRequest(sessionId!, photoId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+    mutationFn: (photoId: string) => removePhotoRequest(sessionIdRef.current!, photoId),
+    onSuccess: () => queryClientRef.current.invalidateQueries({ queryKey: queryKeyRef.current }),
   })
 
   const updateLayoutMutation = useMutation({
     mutationFn: (params: { selectedLayoutId: string | null; photoPositions: PhotoPosition[] }) =>
-      patchCollage(sessionId!, params),
-    onSuccess: (data) => queryClient.setQueryData(queryKey, data),
+      patchCollage(sessionIdRef.current!, params),
+    onSuccess: (data) => queryClientRef.current.setQueryData(queryKeyRef.current, data),
   })
 
   const updatePositionsMutation = useMutation({
     mutationFn: (photoPositions: PhotoPosition[]) =>
-      patchCollage(sessionId!, { photoPositions }),
-    onSuccess: (data) => queryClient.setQueryData(queryKey, data),
+      patchCollage(sessionIdRef.current!, { photoPositions }),
+    onSuccess: (data) => queryClientRef.current.setQueryData(queryKeyRef.current, data),
   })
 
   const updateSettingsMutation = useMutation({
     mutationFn: (settings: CollageSettings) =>
-      patchCollage(sessionId!, { settings }),
-    onSuccess: (data) => queryClient.setQueryData(queryKey, data),
+      patchCollage(sessionIdRef.current!, { settings }),
+    onSuccess: (data) => queryClientRef.current.setQueryData(queryKeyRef.current, data),
   })
 
   const clearAllMutation = useMutation({
@@ -180,43 +195,60 @@ export function useCollageApi() {
       setSessionId(id)
       return { id }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['collage'] }),
+    onSuccess: () => queryClientRef.current.invalidateQueries({ queryKey: ['collage'] }),
   })
 
-  const initCollage = useCallback(() => initMutation.mutate(), [initMutation])
+  // All action callbacks use empty deps — they read current values via refs.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const initCollage = useCallback(() => initMutation.mutate(), [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const addPhoto = useCallback(
+    (photo: { id: string; dataUrl: string; fileName: string }) =>
+      addPhotoMutation.mutateAsync(photo),
+    []
+  )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const removePhoto = useCallback(
+    (photoId: string) => removePhotoMutation.mutateAsync(photoId),
+    []
+  )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const updateLayout = useCallback(
     (selectedLayoutId: string | null, photoPositions: PhotoPosition[]) =>
       updateLayoutMutation.mutateAsync({ selectedLayoutId, photoPositions }),
-    [updateLayoutMutation]
+    []
   )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const updatePositions = useCallback(
     (photoPositions: PhotoPosition[]) =>
       updatePositionsMutation.mutateAsync(photoPositions),
-    [updatePositionsMutation]
+    []
   )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const updateSettings = useCallback(
     (settings: CollageSettings) => updateSettingsMutation.mutateAsync(settings),
-    [updateSettingsMutation]
+    []
   )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const clearAll = useCallback(() => clearAllMutation.mutateAsync(), [])
 
   return {
-    // State
+    // State — stable references for defaults to avoid triggering effects
     collageId: sessionId,
-    photos: collageState?.photos ?? [],
+    photos: collageState?.photos ?? EMPTY_PHOTOS,
     selectedLayoutId: collageState?.selectedLayoutId ?? null,
-    photoPositions: collageState?.photoPositions ?? [],
-    settings: collageState?.settings ?? { gap: 8, backgroundColor: 'transparent', borderRadius: 0 },
+    photoPositions: collageState?.photoPositions ?? EMPTY_POSITIONS,
+    settings: collageState?.settings ?? DEFAULT_SETTINGS,
     isLoading,
     error,
 
-    // Actions
+    // Actions — all stable references
     initCollage,
-    addPhoto: (photo: { id: string; dataUrl: string; fileName: string }) =>
-      addPhotoMutation.mutateAsync(photo),
-    removePhoto: (photoId: string) => removePhotoMutation.mutateAsync(photoId),
+    addPhoto,
+    removePhoto,
     updateLayout,
     updatePositions,
     updateSettings,
-    clearAll: () => clearAllMutation.mutateAsync(),
+    clearAll,
   }
 }

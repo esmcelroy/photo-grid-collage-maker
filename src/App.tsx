@@ -50,7 +50,9 @@ function App() {
     if (!collageId) {
       initCollage()
     }
-  }, [collageId, initCollage])
+    // initCollage is a stable ref — safe to omit from deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collageId])
 
   useEffect(() => {
     const layouts = getLayoutsForPhotoCount(photos.length)
@@ -71,7 +73,7 @@ function App() {
     } else if (photos.length === 0) {
       setSelectedLayout(null)
     }
-  }, [photos, selectedLayoutId, updateLayout])
+  }, [photos, selectedLayoutId]) // updateLayout excluded — stable ref via useCollageApi
 
   useEffect(() => {
     if (selectedLayoutId) {
