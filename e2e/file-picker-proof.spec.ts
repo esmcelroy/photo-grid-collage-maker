@@ -82,19 +82,16 @@ test.describe('File-Picker Upload Proof', () => {
     const countBefore = await app.getCurrentPhotoCount()
     expect(countBefore).toBe(9)
 
-    // Verify upload zone is visually disabled at capacity
+    // Verify upload zone is visually disabled/hidden at capacity
     await app.assertUploadLimitEnforced()
 
-    // Attempt to add one more photo via file-chooser
-    // The test should complete without mutating the state
+    // At capacity the upload zone is removed from the DOM, so the label
+    // and file input no longer exist. Confirm no upload control is present.
     const uploadLabel = page.locator('label[for="photo-upload"]')
-    const isDisabled = await uploadLabel.evaluate(el => {
-      const parent = el.closest('[class*="opacity"]')
-      return parent?.classList.toString().includes('opacity-50')
-    })
+    const labelVisible = await uploadLabel.isVisible().catch(() => false)
+    expect(labelVisible).toBe(false)
 
-    // If the upload control is properly disabled, the test passes
-    // If not, the attempt via file-chooser should be ignored
+    // Photo count must remain at 9 (no state mutation)
     const countAfter = await app.getCurrentPhotoCount()
     expect(countAfter).toBe(9)
 
