@@ -17,9 +17,11 @@ If `branch-name` was not provided, stop immediately and ask:
 
 Do not proceed until a branch name is provided.
 
-### Step 1 — Check for Required UI Tests (if applicable)
+### Step 1 — Check for Required UI Tests and Screenshots (if applicable)
 If the current step included required UI workflow activities, verify that `/run-ui-tests` was completed successfully in this session before committing. If not, warn:
 > ⚠️ This step requires UI tests to pass before committing. Run `/run-ui-tests` first.
+
+After UI tests have passed, collect the proof screenshot filenames and prepare them for inclusion in the PR description (Step 6).
 
 ### Step 2 — Analyze Changes
 ```bash
@@ -64,5 +66,25 @@ git commit -m "<generated commit message>"
 git push origin <branch-name>
 ```
 
-### Step 6 — Report
-Confirm the push succeeded and show the commit SHA and branch URL.
+### Step 6 — Open PR with Screenshots (required for cloud agent sessions)
+After pushing, open a PR (or update the existing one) with a description that includes:
+
+1. A summary of what changed and why
+2. A **Playwright Screenshots** section listing every proof screenshot captured during `/run-ui-tests`:
+
+```markdown
+## 🎭 Playwright Screenshots
+
+The following screenshots were captured during UI testing to prove the feature works end-to-end.
+Screenshots follow the naming convention `proof-<checkpoint>-<timestamp>.png` (e.g., `proof-upload-complete-1713200000000.png`).
+
+- `proof-<checkpoint>-<timestamp>.png` — <describe what the screenshot shows>
+- ...
+
+> Full Playwright report is available in the CI `playwright-report` artifact.
+```
+
+If no UI tests were run for this session, note that in the PR description instead.
+
+### Step 7 — Report
+Confirm the push succeeded and show the commit SHA, branch URL, and PR link.

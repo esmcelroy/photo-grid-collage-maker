@@ -48,6 +48,13 @@ GitHub CLI commands for workflow automation (available to all modes):
 - Steps are posted as comments on the main issue
 - Use these commands when /opsx:issue, /execute-step, or /validate-step prompts are invoked
 
+## PR Summary Requirements
+When cloud agent sessions complete work and open a PR, screenshots from Playwright UI tests **must** be included in the PR description as the final step:
+- Run `/run-ui-tests` to execute Playwright tests and capture proof screenshots
+- List the captured `test-results/proof-*.png` files in the PR description and describe what each one shows
+- If screenshots cannot be embedded directly, note that they are available in the CI workflow `playwright-report` artifact
+- Never finalize a PR without including the Playwright screenshot evidence section
+
 ## Git Workflow
 - Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, etc.
 - Feature branches: `feature/<descriptive-name>`
