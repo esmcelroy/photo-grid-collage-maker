@@ -99,8 +99,11 @@ jobs:
           if-no-files-found: ignore
 
   ui-test:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -124,10 +127,64 @@ jobs:
           fi
       - name: Install Playwright browsers
         if: steps.ui-test-script.outputs.exists == 'true'
-        run: npx playwright install --with-deps
+        run: npx playwright install --with-deps chromium
       - name: Run UI tests
         if: steps.ui-test-script.outputs.exists == 'true'
+        id: ui-tests
         run: npm run test:ui
+        continue-on-error: true
+      - name: Upload Playwright report
+        if: steps.ui-test-script.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: test-results/
+          if-no-files-found: ignore
+      - name: Post Playwright results to PR
+        if: steps.ui-test-script.outputs.exists == 'true' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const passed = '${{ steps.ui-tests.outcome }}' === 'success';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            // Recursively find all proof screenshots in test-results/
+            function findProofScreenshots(dir) {
+              if (!fs.existsSync(dir)) return [];
+              return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+                const fullPath = path.join(dir, entry.name);
+                if (entry.isDirectory()) return findProofScreenshots(fullPath);
+                if (entry.isFile() && entry.name.startsWith('proof-') && entry.name.endsWith('.png')) {
+                  return [entry.name];
+                }
+                return [];
+              });
+            }
+
+            const screenshots = findProofScreenshots('./test-results');
+            let screenshotSection = '';
+            if (screenshots.length > 0) {
+              screenshotSection = '\n\n### 📸 Proof Screenshots\n' +
+                screenshots.map(f => `- \`${f}\``).join('\n') +
+                `\n\n> To view screenshots: open the [Actions run](${runUrl}), scroll to **Artifacts**, and download \`playwright-report\`.`;
+            }
+
+            const status = passed ? '✅ All UI tests passed' : '❌ Some UI tests failed';
+            const body = `## 🎭 Playwright UI Test Results\n\n${status}\n\n[View full report →](${runUrl})${screenshotSection}`;
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
       - name: Skip UI tests when test:ui script is not configured
         if: steps.ui-test-script.outputs.exists != 'true'
         run: echo "No test:ui script found. Skipping UI test job."
+      - name: Fail job if UI tests failed
+        if: steps.ui-test-script.outputs.exists == 'true' && steps.ui-tests.outcome == 'failure'
+        run: exit 1

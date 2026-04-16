@@ -53,6 +53,13 @@ Failures:
 - <test name>: <brief description of what failed>
 ```
 
+List all proof screenshots captured during the run:
+```bash
+ls test-results/proof-*.png 2>/dev/null || echo "No proof screenshots found"
+```
+
+Include the filenames and a brief description of what each one shows in your summary. These screenshots **must** be referenced in the PR description.
+
 ### Step 5 — Classify Failures
 For each failure, classify the likely root cause:
 
