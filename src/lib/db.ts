@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie'
+import { MAX_PHOTOS } from '@/lib/types'
 import type { CollageSettings, PhotoPosition } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -179,8 +180,8 @@ export async function addPhoto(
   photo: { id: string; dataUrl: string; fileName: string }
 ): Promise<{ id: string; fileName: string; dataUrl: string }> {
   const existingCount = await db.photos.where('collageId').equals(collageId).count()
-  if (existingCount >= 9) {
-    throw new Error('Maximum of 9 photos per collage')
+  if (existingCount >= MAX_PHOTOS) {
+    throw new Error(`Maximum of ${MAX_PHOTOS} photos per collage`)
   }
 
   await db.photos.add({
