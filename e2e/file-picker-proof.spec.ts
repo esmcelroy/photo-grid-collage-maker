@@ -59,38 +59,33 @@ test.describe('File-Picker Upload Proof', () => {
   })
 
   test('[PROOF] rejected uploads above limit do not mutate state', async ({ page }) => {
-    // Upload up to the 9-photo limit
-    const imageFiles = [
-      'test-image.jpg',
-      'test-image-2.jpg',
-      'test-photo.jpg',
-      'test-image.jpg',
-      'test-image-2.jpg',
-      'test-photo.jpg',
-      'test-image.jpg',
-      'test-image-2.jpg',
-      'test-photo.jpg',
-    ]
+    test.setTimeout(120_000) // 16 uploads with individual waits
+    // Upload up to the 16-photo limit using 3 fixture images in rotation
+    const fixtures = ['test-image.jpg', 'test-image-2.jpg', 'test-photo.jpg']
 
-    // Upload 9 photos (using loop with hidden input for speed in this boundary test)
-    for (const file of imageFiles) {
+    // Upload 16 photos one at a time, waiting for count badge after each
+    for (let i = 0; i < 16; i++) {
+      const file = fixtures[i % fixtures.length]
       await app.uploadViaHiddenInput([file])
+      // Wait for the badge to reflect the new count
+      const expectedCount = i + 1
+      await expect(page.getByText(`${expectedCount} / 16`)).toBeVisible({ timeout: 10000 })
     }
 
     // Verify we're at capacity
     const countBefore = await app.getCurrentPhotoCount()
-    expect(countBefore).toBe(9)
+    expect(countBefore).toBe(16)
 
     // Verify upload zone is hidden at capacity
     await app.assertUploadLimitEnforced()
 
-    // The upload label should not be visible at 9/9
+    // The upload label should not be visible at 16/16
     const uploadLabel = page.locator('label[for="photo-upload"]')
     await expect(uploadLabel).not.toBeVisible()
 
-    // Count should remain at 9
+    // Count should remain at 16
     const countAfter = await app.getCurrentPhotoCount()
-    expect(countAfter).toBe(9)
+    expect(countAfter).toBe(16)
 
     await app.takeProofScreenshot('upload-limit-enforced')
   })

@@ -2,6 +2,7 @@ import { jest } from '@jest/globals'
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { UploadZone } from '@/components/UploadZone'
+import { MAX_PHOTOS } from '@/lib/types'
 
 describe('UploadZone', () => {
   it('renders the upload prompt by default', () => {
@@ -30,7 +31,7 @@ describe('UploadZone', () => {
 
   it('respects the remaining slot limit', async () => {
     const onFilesSelected = jest.fn()
-    render(<UploadZone onFilesSelected={onFilesSelected} currentFileCount={8} maxFiles={9} />)
+    render(<UploadZone onFilesSelected={onFilesSelected} currentFileCount={MAX_PHOTOS - 1} maxFiles={MAX_PHOTOS} />)
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     const files = [
       new File(['img'], '1.jpg', { type: 'image/jpeg' }),
@@ -41,15 +42,15 @@ describe('UploadZone', () => {
   })
 
   it('shows max reached message and disables input when at limit', () => {
-    render(<UploadZone onFilesSelected={jest.fn()} currentFileCount={9} maxFiles={9} />)
-    expect(screen.getByText(/maximum of 9 photos reached/i)).toBeInTheDocument()
+    render(<UploadZone onFilesSelected={jest.fn()} currentFileCount={MAX_PHOTOS} maxFiles={MAX_PHOTOS} />)
+    expect(screen.getByText(new RegExp(`maximum of ${MAX_PHOTOS} photos reached`, 'i'))).toBeInTheDocument()
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     expect(input).toBeDisabled()
   })
 
   it('does not call onFilesSelected when at limit', async () => {
     const onFilesSelected = jest.fn()
-    render(<UploadZone onFilesSelected={onFilesSelected} currentFileCount={9} maxFiles={9} />)
+    render(<UploadZone onFilesSelected={onFilesSelected} currentFileCount={MAX_PHOTOS} maxFiles={MAX_PHOTOS} />)
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     const file = new File(['img'], 'extra.jpg', { type: 'image/jpeg' })
     await userEvent.upload(input, file)
@@ -110,7 +111,7 @@ describe('UploadZone', () => {
 
   it('does not enter dragging state when already at the upload limit', () => {
     const { container } = render(
-      <UploadZone onFilesSelected={jest.fn()} currentFileCount={9} maxFiles={9} />
+      <UploadZone onFilesSelected={jest.fn()} currentFileCount={MAX_PHOTOS} maxFiles={MAX_PHOTOS} />
     )
     const dropZone = container.firstChild as HTMLElement
 

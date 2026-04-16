@@ -1,3 +1,5 @@
+export const MAX_PHOTOS = 16
+
 export interface UploadedPhoto {
   id: string
   file: File
