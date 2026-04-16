@@ -1,22 +1,13 @@
 import { test, expect } from '@playwright/test'
-import path from 'path'
-import { fileURLToPath } from 'url'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-/** Reset the Spark KV store to a clean state before each test. */
-async function clearKVState(request: import('@playwright/test').APIRequestContext) {
-  for (const key of ['collage-photos', 'selected-layout', 'photo-positions', 'collage-settings']) {
-    await request.delete(`/_spark/kv/${encodeURIComponent(key)}`).catch(() => {})
-  }
-}
+import { AppPage } from './pages/app.page'
 
 test.describe('Photo Management', () => {
+  let app: AppPage
+
   test.beforeEach(async ({ page, request }) => {
-    await clearKVState(request)
-    await page.goto('/')
-    await page.waitForLoadState('domcontentloaded')
+    app = new AppPage(page, request)
+    await app.clearState()
+    await app.goto()
   })
 
   test('shows "Get Started" text when no photos are uploaded', async ({ page }) => {
@@ -24,22 +15,17 @@ test.describe('Photo Management', () => {
   })
 
   test('shows "Your Photos" panel after upload', async ({ page }) => {
-    const fileInput = page.locator('input[type="file"]')
-    await fileInput.setInputFiles(path.join(__dirname, 'fixtures/test-image.jpg'))
-
+    await app.uploadViaFileChooser(['test-image.jpg'])
     await expect(page.getByText('Your Photos')).toBeVisible()
   })
 
   test('"Clear All" button is present after uploading photos', async ({ page }) => {
-    const fileInput = page.locator('input[type="file"]')
-    await fileInput.setInputFiles(path.join(__dirname, 'fixtures/test-image.jpg'))
-
+    await app.uploadViaFileChooser(['test-image.jpg'])
     await expect(page.getByRole('button', { name: /clear all/i })).toBeVisible()
   })
 
   test('clear all button removes all photos and returns to empty state', async ({ page }) => {
-    const fileInput = page.locator('input[type="file"]')
-    await fileInput.setInputFiles(path.join(__dirname, 'fixtures/test-image.jpg'))
+    await app.uploadViaFileChooser(['test-image.jpg'])
 
     // Confirm photos are loaded
     await expect(page.getByText('Your Photos')).toBeVisible()
@@ -53,12 +39,7 @@ test.describe('Photo Management', () => {
   })
 
   test('uploading two photos shows count badge 2 / 9', async ({ page }) => {
-    const fileInput = page.locator('input[type="file"]')
-    await fileInput.setInputFiles([
-      path.join(__dirname, 'fixtures/test-image.jpg'),
-      path.join(__dirname, 'fixtures/test-image-2.jpg'),
-    ])
-
-    await expect(page.getByText('2 / 9')).toBeVisible()
+    await app.uploadViaFileChooser(['test-image.jpg', 'test-image-2.jpg'])
+    await app.assertPhotoCountBadge(2)
   })
 })

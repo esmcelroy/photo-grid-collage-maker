@@ -6,10 +6,16 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
+  // Configure reporters for CI proof artifacts
+  reporter: [
+    ['html', { outputFolder: 'test-results/playwright-report' }],
+    ['list'], // Console output for quick feedback
+  ],
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',
+    // Screenshot configuration for proof artifacts
+    screenshot: 'only-on-failure', // Only capture on failures to keep CI artifacts lean
   },
   projects: [
     {
