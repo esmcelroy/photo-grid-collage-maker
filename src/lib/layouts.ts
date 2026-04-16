@@ -552,6 +552,260 @@ export const GRID_LAYOUTS: GridLayout[] = [
     gridTemplate: '1fr 2fr 1fr / 1fr 2fr 1fr',
     areas: ['a b c', 'd e f', 'g h i'],
     aspectRatio: '1/1'
+  },
+
+  // ─── 10 photos ──────────────────────────────────────────────────────────────
+  {
+    id: '10-grid-2x5',
+    name: 'Two Rows',
+    photoCount: 10,
+    gridTemplate: '1fr 1fr / 1fr 1fr 1fr 1fr 1fr',
+    areas: ['a b c d e', 'f g h i j'],
+    aspectRatio: '21/9'
+  },
+  {
+    id: '10-grid-5x2',
+    name: 'Five Rows',
+    photoCount: 10,
+    gridTemplate: '1fr 1fr 1fr 1fr 1fr / 1fr 1fr',
+    areas: ['a b', 'c d', 'e f', 'g h', 'i j'],
+    aspectRatio: '9/21'
+  },
+  {
+    id: '10-top-hero',
+    name: 'Top Hero',
+    photoCount: 10,
+    gridTemplate: '2fr 1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a a a', 'b c d', 'e f g', 'h i j'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '10-mosaic',
+    name: 'Mosaic',
+    photoCount: 10,
+    gridTemplate: '1fr 1fr 1fr / 2fr 1fr 1fr',
+    areas: ['a a b', 'c d e', 'f g g', 'h i j'],
+    aspectRatio: '3/4'
+  },
+  {
+    id: '10-classic-grid',
+    name: 'Classic Grid',
+    photoCount: 10,
+    gridTemplate: '1fr 1fr 1fr 1fr 1fr / 1fr 1fr',
+    areas: ['a b', 'c d', 'e f', 'g h', 'i j'],
+    aspectRatio: '3/4'
+  },
+
+  // ─── 11 photos ──────────────────────────────────────────────────────────────
+  {
+    id: '11-rows-3-4-4',
+    name: 'Three Rows',
+    photoCount: 11,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
+    areas: ['a b c c', 'd e f g', 'h i j k'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '11-left-hero',
+    name: 'Left Hero',
+    photoCount: 11,
+    gridTemplate: '1fr 1fr 1fr / 2fr 1fr 1fr 1fr',
+    areas: ['a b c d', 'a e f g', 'a h i j', 'a k k k'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '11-mixed',
+    name: 'Mixed Sizes',
+    photoCount: 11,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a a b', 'c d e', 'f g h', 'i j k'],
+    aspectRatio: '3/4'
+  },
+  {
+    id: '11-top-bottom',
+    name: 'Top & Bottom',
+    photoCount: 11,
+    gridTemplate: '2fr 1fr 1fr 2fr / 1fr 1fr 1fr',
+    areas: ['a a a', 'b c d', 'e f g', 'h i j', 'k k k'],
+    aspectRatio: '3/4'
+  },
+
+  // ─── 12 photos ──────────────────────────────────────────────────────────────
+  {
+    id: '12-grid-3x4',
+    name: 'Classic 3×4',
+    photoCount: 12,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
+    areas: ['a b c d', 'e f g h', 'i j k l'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '12-grid-4x3',
+    name: 'Classic 4×3',
+    photoCount: 12,
+    gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a b c', 'd e f', 'g h i', 'j k l'],
+    aspectRatio: '3/4'
+  },
+  {
+    id: '12-grid-2x6',
+    name: 'Wide 2×6',
+    photoCount: 12,
+    gridTemplate: '1fr 1fr / 1fr 1fr 1fr 1fr 1fr 1fr',
+    areas: ['a b c d e f', 'g h i j k l'],
+    aspectRatio: '21/9'
+  },
+  {
+    id: '12-hero-mosaic',
+    name: 'Hero Mosaic',
+    photoCount: 12,
+    gridTemplate: '2fr 1fr 1fr / 1fr 1fr 1fr 1fr',
+    areas: ['a a b b', 'c d e f', 'g h i j', 'k k l l'],
+    aspectRatio: '1/1'
+  },
+  {
+    id: '12-mixed',
+    name: 'Mixed Sizes',
+    photoCount: 12,
+    gridTemplate: '1fr 1fr 1fr / 2fr 1fr 1fr 1fr',
+    areas: ['a a b c', 'd e f g', 'h i j j', 'k k l l'],
+    aspectRatio: '3/4'
+  },
+
+  // ─── 13 photos ──────────────────────────────────────────────────────────────
+  {
+    id: '13-top-hero',
+    name: 'Top Hero',
+    photoCount: 13,
+    gridTemplate: '2fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
+    areas: ['a a a a', 'b c d e', 'f g h i', 'j k l m'],
+    aspectRatio: '4/3'
+  },
+  {
+    id: '13-asymmetric',
+    name: 'Asymmetric',
+    photoCount: 13,
+    gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
+    areas: ['a b c c', 'd e f g', 'h i j k', 'l l m m'],
+    aspectRatio: '1/1'
+  },
+  {
+    id: '13-mixed',
+    name: 'Mixed Rows',
+    photoCount: 13,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr 1fr 1fr',
+    areas: ['a b c d e', 'f g g h h', 'i j k l m'],
+    aspectRatio: '16/9'
+  },
+  {
+    id: '13-mosaic',
+    name: 'Mosaic',
+    photoCount: 13,
+    gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a a b', 'c d e', 'f g h', 'i j j', 'k l m'],
+    aspectRatio: '3/4'
+  },
+
+  // ─── 14 photos ──────────────────────────────────────────────────────────────
+  {
+    id: '14-grid-2x7',
+    name: 'Two Rows',
+    photoCount: 14,
+    gridTemplate: '1fr 1fr / 1fr 1fr 1fr 1fr 1fr 1fr 1fr',
+    areas: ['a b c d e f g', 'h i j k l m n'],
+    aspectRatio: '21/9'
+  },
+  {
+    id: '14-grid-7x2',
+    name: 'Seven Rows',
+    photoCount: 14,
+    gridTemplate: '1fr 1fr 1fr 1fr 1fr 1fr 1fr / 1fr 1fr',
+    areas: ['a b', 'c d', 'e f', 'g h', 'i j', 'k l', 'm n'],
+    aspectRatio: '9/21'
+  },
+  {
+    id: '14-hero-grid',
+    name: 'Hero + Grid',
+    photoCount: 14,
+    gridTemplate: '2fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
+    areas: ['a a a a', 'a a a a', 'b c d e', 'f g h i', 'j k l m', 'n n n n'],
+    aspectRatio: '3/4'
+  },
+  {
+    id: '14-mixed',
+    name: 'Mixed Rows',
+    photoCount: 14,
+    gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr 1fr',
+    areas: ['a b c d d', 'e f g h h', 'i j k l m', 'n n n n n'],
+    aspectRatio: '4/3'
+  },
+
+  // ─── 15 photos ──────────────────────────────────────────────────────────────
+  {
+    id: '15-grid-3x5',
+    name: 'Classic 3×5',
+    photoCount: 15,
+    gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr 1fr 1fr',
+    areas: ['a b c d e', 'f g h i j', 'k l m n o'],
+    aspectRatio: '16/9'
+  },
+  {
+    id: '15-grid-5x3',
+    name: 'Classic 5×3',
+    photoCount: 15,
+    gridTemplate: '1fr 1fr 1fr 1fr 1fr / 1fr 1fr 1fr',
+    areas: ['a b c', 'd e f', 'g h i', 'j k l', 'm n o'],
+    aspectRatio: '9/16'
+  },
+  {
+    id: '15-hero-grid',
+    name: 'Hero + Grid',
+    photoCount: 15,
+    gridTemplate: '2fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
+    areas: ['a a b b', 'c d e f', 'g h i j', 'k l m n', 'o o o o'],
+    aspectRatio: '3/4'
+  },
+  {
+    id: '15-pyramid',
+    name: 'Pyramid',
+    photoCount: 15,
+    gridTemplate: '1fr 1fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr 1fr',
+    areas: ['a a a b b', 'c d e f f', 'g h i j k', 'l l m n n', 'o o o o o'],
+    aspectRatio: '1/1'
+  },
+
+  // ─── 16 photos ──────────────────────────────────────────────────────────────
+  {
+    id: '16-grid-4x4',
+    name: 'Classic 4×4',
+    photoCount: 16,
+    gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
+    areas: ['a b c d', 'e f g h', 'i j k l', 'm n o p'],
+    aspectRatio: '1/1'
+  },
+  {
+    id: '16-wide-grid',
+    name: 'Wide 4×4',
+    photoCount: 16,
+    gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
+    areas: ['a b c d', 'e f g h', 'i j k l', 'm n o p'],
+    aspectRatio: '16/9'
+  },
+  {
+    id: '16-hero-grid',
+    name: 'Hero + Grid',
+    photoCount: 16,
+    gridTemplate: '2fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
+    areas: ['a a b b', 'c d e f', 'g h i j', 'k l m n', 'o o p p'],
+    aspectRatio: '3/4'
+  },
+  {
+    id: '16-mixed',
+    name: 'Mixed Sizes',
+    photoCount: 16,
+    gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr 1fr',
+    areas: ['a a b c d', 'e f g h h', 'i j k l m', 'n n o o p'],
+    aspectRatio: '4/3'
   }
 ]
 

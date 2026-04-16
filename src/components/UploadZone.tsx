@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { UploadSimple, Image as ImageIcon } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
+import { MAX_PHOTOS } from '@/lib/types'
 
 interface UploadZoneProps {
   onFilesSelected: (files: File[]) => void
@@ -10,7 +11,7 @@ interface UploadZoneProps {
 
 export function UploadZone({ 
   onFilesSelected, 
-  maxFiles = 9,
+  maxFiles = MAX_PHOTOS,
   currentFileCount = 0 
 }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false)

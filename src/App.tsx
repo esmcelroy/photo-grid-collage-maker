@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useCollageApi } from '@/hooks/useCollageApi'
-import { UploadedPhoto, PhotoPosition, GridLayout, CollageSettings, ExportOptions } from '@/lib/types'
+import { UploadedPhoto, PhotoPosition, GridLayout, CollageSettings, ExportOptions, MAX_PHOTOS } from '@/lib/types'
 import { getLayoutsForPhotoCount, getUniqueAreaNames } from '@/lib/layouts'
 import { fileToDataUrl, generateUniqueId, downloadCollage } from '@/lib/image-utils'
 import { UploadZone } from '@/components/UploadZone'
@@ -87,7 +87,7 @@ function App() {
 
   const handleFilesSelected = useCallback(async (files: File[]) => {
     try {
-      const remaining = 9 - photos.length
+      const remaining = MAX_PHOTOS - photos.length
       const toAdd = files.slice(0, remaining)
       await Promise.all(
         toAdd.map(async (file) => {
@@ -217,7 +217,7 @@ function App() {
                   <div className="flex items-center gap-2">
                     <h3 className="text-lg font-semibold">Your Photos</h3>
                     <Badge variant="secondary">
-                      {photos.length} / 9
+                      {photos.length} / {MAX_PHOTOS}
                     </Badge>
                   </div>
                   <Button
@@ -243,7 +243,7 @@ function App() {
                   </AnimatePresence>
                 </div>
 
-                {photos.length < 9 && (
+                {photos.length < MAX_PHOTOS && (
                   <UploadZone 
                     onFilesSelected={handleFilesSelected}
                     currentFileCount={photos.length}
@@ -309,7 +309,7 @@ function App() {
               Get Started
             </h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              Upload 1-9 photos to begin creating your custom collage. 
+              Upload 1-{MAX_PHOTOS} photos to begin creating your custom collage. 
               Choose from dozens of beautiful layouts and customize to your liking.
             </p>
           </motion.div>

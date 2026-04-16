@@ -14,6 +14,14 @@ describe('getLayoutsForPhotoCount', () => {
   })
 
   it('returns an empty array for counts above the maximum', () => {
-    expect(getLayoutsForPhotoCount(10)).toHaveLength(0)
+    expect(getLayoutsForPhotoCount(17)).toHaveLength(0)
+  })
+
+  it('returns layouts for all counts from 1 to 16', () => {
+    for (let count = 1; count <= 16; count++) {
+      const layouts = getLayoutsForPhotoCount(count)
+      expect(layouts.length).toBeGreaterThanOrEqual(4)
+      expect(layouts.every(l => l.photoCount === count)).toBe(true)
+    }
   })
 })
