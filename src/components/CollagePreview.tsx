@@ -3,7 +3,7 @@ import { GridLayout, PhotoPosition, UploadedPhoto, CollageSettings } from '@/lib
 import { getUniqueAreaNames } from '@/lib/layouts'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { ArrowsOutSimple } from '@phosphor-icons/react'
+import { ArrowsOutSimple, PencilSimple } from '@phosphor-icons/react'
 
 interface CollagePreviewProps {
   layout: GridLayout
@@ -11,6 +11,7 @@ interface CollagePreviewProps {
   photoPositions: PhotoPosition[]
   settings: CollageSettings
   onPositionsChange: (positions: PhotoPosition[]) => void
+  onEditPhoto?: (area: string) => void
   previewRef?: React.RefObject<HTMLDivElement | null>
 }
 
@@ -20,6 +21,7 @@ export function CollagePreview({
   photoPositions,
   settings,
   onPositionsChange,
+  onEditPhoto,
   previewRef
 }: CollagePreviewProps) {
   const [draggedArea, setDraggedArea] = useState<string | null>(null)
@@ -228,6 +230,7 @@ export function CollagePreview({
       >
         {getUniqueAreaNames(layout.areas).map((area) => {
           const photo = getPhotoForArea(area)
+          const positionData = photoPositions.find(p => p.gridArea === area)
           const isDragging = draggedArea === area
           const isDragOver = dragOverArea === area && draggedArea !== area
           const isSelected = selectedArea === area
@@ -278,10 +281,29 @@ export function CollagePreview({
                     alt=""
                     className="w-full h-full object-cover select-none pointer-events-none"
                     draggable={false}
+                    style={{
+                      objectPosition: positionData?.objectPosition ?? '50% 50%',
+                      transform: buildTransform(positionData),
+                    }}
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center pointer-events-none">
-                    <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 rounded-full p-3 backdrop-blur-sm">
-                      <ArrowsOutSimple className="w-6 h-6 text-primary" weight="bold" />
+                    <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 flex gap-2">
+                      <div className="bg-white/90 rounded-full p-3 backdrop-blur-sm">
+                        <ArrowsOutSimple className="w-6 h-6 text-primary" weight="bold" />
+                      </div>
+                      {onEditPhoto && (
+                        <button
+                          className="bg-white/90 rounded-full p-3 backdrop-blur-sm pointer-events-auto hover:bg-white transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onEditPhoto(area)
+                          }}
+                          aria-label={`Edit photo in slot ${area}`}
+                          tabIndex={-1}
+                        >
+                          <PencilSimple className="w-6 h-6 text-primary" weight="bold" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </>
@@ -296,6 +318,14 @@ export function CollagePreview({
       </div>
     </Card>
   )
+}
+
+function buildTransform(position?: PhotoPosition): string | undefined {
+  if (!position) return undefined
+  const parts: string[] = []
+  if (position.rotation) parts.push(`rotate(${position.rotation}deg)`)
+  if (position.scale && position.scale !== 1) parts.push(`scale(${position.scale})`)
+  return parts.length > 0 ? parts.join(' ') : undefined
 }
 
 function parseTemplate(template: string): { rows: string[], columns: string[] } {

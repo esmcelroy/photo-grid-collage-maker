@@ -25,6 +25,9 @@ export interface PhotoPositionRecord {
   collageId: string
   photoId: string
   gridArea: string
+  objectPosition?: string
+  rotation?: number
+  scale?: number
 }
 
 // Assembled state returned to the UI (mirrors the old API response)
@@ -48,6 +51,12 @@ class CollageDatabase extends Dexie {
   constructor() {
     super('collage-maker')
     this.version(1).stores({
+      collages: 'id',
+      photos: 'id, collageId',
+      photoPositions: '[collageId+photoId], collageId',
+    })
+    // v2: Add objectPosition, rotation, scale to photoPositions (non-indexed)
+    this.version(2).stores({
       collages: 'id',
       photos: 'id, collageId',
       photoPositions: '[collageId+photoId], collageId',
@@ -108,7 +117,13 @@ export async function getCollageState(id: string): Promise<CollageState | null> 
     id: collage.id,
     photos: photos.map((p) => ({ id: p.id, fileName: p.fileName, dataUrl: p.dataUrl })),
     selectedLayoutId: collage.selectedLayoutId,
-    photoPositions: positions.map((p) => ({ photoId: p.photoId, gridArea: p.gridArea })),
+    photoPositions: positions.map((p) => ({
+      photoId: p.photoId,
+      gridArea: p.gridArea,
+      ...(p.objectPosition !== undefined && { objectPosition: p.objectPosition }),
+      ...(p.rotation !== undefined && { rotation: p.rotation }),
+      ...(p.scale !== undefined && { scale: p.scale }),
+    })),
     settings: collage.settings,
   }
 }
@@ -145,6 +160,9 @@ export async function updateCollage(
             collageId: id,
             photoId: p.photoId,
             gridArea: p.gridArea,
+            ...(p.objectPosition !== undefined && { objectPosition: p.objectPosition }),
+            ...(p.rotation !== undefined && { rotation: p.rotation }),
+            ...(p.scale !== undefined && { scale: p.scale }),
           }))
         )
       }
