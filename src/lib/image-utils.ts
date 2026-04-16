@@ -37,16 +37,44 @@ export function convertModernColors(value: string): string {
   return value
 }
 
+// CSS properties that can contain color values resolved from Tailwind oklch vars
+const COLOR_PROPS = [
+  'color', 'background-color', 'border-color',
+  'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+  'outline-color', 'text-decoration-color', 'caret-color',
+  'box-shadow', 'text-shadow',
+] as const
+
 /**
- * Walks the subtree of `root` and converts any inline oklch/oklab color
- * values to rgb so html2canvas can parse them. Returns a cleanup function
- * that restores the original inline styles.
+ * Walks the subtree of `root` and overrides any computed or inline oklch/oklab
+ * color values with rgb equivalents so html2canvas can parse them.
+ * Handles both CSS-class-derived (computed) oklch values from Tailwind v4 and
+ * explicit inline style oklch values. Returns a cleanup function that restores
+ * the original inline styles.
  */
 export function replaceOklchInSubtree(root: HTMLElement): () => void {
   const restoreFns: Array<() => void> = []
 
   const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))]
   for (const el of elements) {
+    // Handle computed styles (Tailwind classes → CSS vars → oklch)
+    const computed = getComputedStyle(el)
+    for (const prop of COLOR_PROPS) {
+      const val = computed.getPropertyValue(prop)
+      if (val && (val.includes('oklch') || val.includes('oklab'))) {
+        const converted = convertModernColors(val)
+        if (converted !== val) {
+          const prev = el.style.getPropertyValue(prop)
+          el.style.setProperty(prop, converted)
+          restoreFns.push(() => {
+            if (prev) el.style.setProperty(prop, prev)
+            else el.style.removeProperty(prop)
+          })
+        }
+      }
+    }
+
+    // Handle inline style attribute strings with oklch
     const inlineStyle = el.getAttribute('style') || ''
     if (inlineStyle.includes('oklch') || inlineStyle.includes('oklab')) {
       const originalStyle = inlineStyle
