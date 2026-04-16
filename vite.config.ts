@@ -12,7 +12,7 @@ const isProduction = process.env.GITHUB_PAGES === 'true' || process.env.NODE_ENV
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: process.env.GITHUB_PAGES ? '/photo-grid-collage-maker/' : '/',
+  base: '/',
   plugins: [
     react(),
     tailwindcss(),
