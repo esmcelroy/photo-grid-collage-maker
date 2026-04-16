@@ -1,4 +1,5 @@
 import { GridLayout, PhotoPosition, UploadedPhoto } from '@/lib/types'
+import { getUniqueAreaNames } from '@/lib/layouts'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 
@@ -50,7 +51,7 @@ export function LayoutOption({
             gap: '2px',
           }}
         >
-          {layout.areas.map((area) => {
+          {getUniqueAreaNames(layout.areas).map((area) => {
             const photo = getPhotoForArea(area)
             return (
               <div

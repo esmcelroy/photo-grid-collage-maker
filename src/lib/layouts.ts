@@ -558,3 +558,21 @@ export const GRID_LAYOUTS: GridLayout[] = [
 export function getLayoutsForPhotoCount(count: number): GridLayout[] {
   return GRID_LAYOUTS.filter(layout => layout.photoCount === count)
 }
+
+/**
+ * Extract unique area names from grid-template-area row strings.
+ * e.g. ['a b a', 'c d e', 'a b a'] → ['a', 'b', 'c', 'd', 'e']
+ */
+export function getUniqueAreaNames(areas: string[]): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const row of areas) {
+    for (const name of row.split(' ')) {
+      if (!seen.has(name)) {
+        seen.add(name)
+        result.push(name)
+      }
+    }
+  }
+  return result
+}

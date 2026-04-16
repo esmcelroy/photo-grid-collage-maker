@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useCollageApi } from '@/hooks/useCollageApi'
 import { UploadedPhoto, PhotoPosition, GridLayout, CollageSettings } from '@/lib/types'
-import { getLayoutsForPhotoCount } from '@/lib/layouts'
+import { getLayoutsForPhotoCount, getUniqueAreaNames } from '@/lib/layouts'
 import { fileToDataUrl, generateUniqueId, downloadCollage } from '@/lib/image-utils'
 import { UploadZone } from '@/components/UploadZone'
 import { PhotoThumbnail } from '@/components/PhotoThumbnail'
@@ -17,7 +17,7 @@ import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 
 function initializePositions(layout: GridLayout, photosArray: UploadedPhoto[]): PhotoPosition[] {
-  return layout.areas.map((area, index) => ({
+  return getUniqueAreaNames(layout.areas).map((area, index) => ({
     photoId: photosArray[index]?.id || '',
     gridArea: area,
   }))
