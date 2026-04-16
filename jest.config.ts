@@ -29,6 +29,7 @@ const config: Config = {
     '!src/main.tsx',
     '!src/App.tsx',          // Integration component — covered by Playwright E2E tests
     '!src/ErrorFallback.tsx', // Uses import.meta.env (Vite-only API); not testable in Jest
+    '!src/lib/db.ts',        // Dexie/IndexedDB layer — covered by Playwright E2E tests
     '!src/components/ui/**',
     '!src/vite-end.d.ts',
     '!src/index.css',
