@@ -6,6 +6,8 @@ const config: Config = {
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    // lucide-react is ESM-only; mock all icons used by shadcn components
+    'lucide-react/dist/esm/icons/(.*)': '<rootDir>/src/__tests__/__mocks__/lucide-icon.tsx',
   },
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
   // Only match *.test.ts / *.test.tsx — excludes setup files and Playwright .spec.ts

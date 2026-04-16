@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useCollageApi } from '@/hooks/useCollageApi'
-import { UploadedPhoto, PhotoPosition, GridLayout, CollageSettings } from '@/lib/types'
+import { UploadedPhoto, PhotoPosition, GridLayout, CollageSettings, ExportOptions } from '@/lib/types'
 import { getLayoutsForPhotoCount, getUniqueAreaNames } from '@/lib/layouts'
 import { fileToDataUrl, generateUniqueId, downloadCollage } from '@/lib/image-utils'
 import { UploadZone } from '@/components/UploadZone'
@@ -8,11 +8,12 @@ import { PhotoThumbnail } from '@/components/PhotoThumbnail'
 import { LayoutGallery } from '@/components/LayoutGallery'
 import { CollagePreview } from '@/components/CollagePreview'
 import { CustomizationControls } from '@/components/CustomizationControls'
+import { ExportDialog } from '@/components/ExportDialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Toaster } from '@/components/ui/sonner'
-import { DownloadSimple, Trash, Sparkle } from '@phosphor-icons/react'
+import { Trash, Sparkle } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -127,7 +128,7 @@ function App() {
     toast.success(`Layout changed to ${layout.name}`)
   }, [availableLayouts, photos, updateLayout])
 
-  const handleDownload = async () => {
+  const handleDownload = async (options: ExportOptions) => {
     if (!previewRef.current || !selectedLayout) {
       toast.error('No collage to download')
       return
@@ -135,7 +136,12 @@ function App() {
 
     try {
       toast.info('Preparing your collage...')
-      await downloadCollage(previewRef.current, `collage-${Date.now()}.png`)
+      await downloadCollage(
+        previewRef.current,
+        options.filename,
+        options.format,
+        options.quality
+      )
       toast.success('Collage downloaded successfully!')
     } catch (error) {
       toast.error('Failed to download collage')
@@ -224,10 +230,10 @@ function App() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Preview</h3>
-                  <Button onClick={handleDownload} size="lg">
-                    <DownloadSimple className="w-5 h-5 mr-2" weight="duotone" />
-                    Download
-                  </Button>
+                  <ExportDialog
+                    onExport={handleDownload}
+                    disabled={!selectedLayout}
+                  />
                 </div>
                 <CollagePreview
                   layout={selectedLayout}

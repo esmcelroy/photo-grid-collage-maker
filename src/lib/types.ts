@@ -24,6 +24,14 @@ export interface CollageSettings {
   borderRadius: number
 }
 
+export type ExportFormat = 'png' | 'jpeg'
+
+export interface ExportOptions {
+  format: ExportFormat
+  quality: number // 0.0–1.0, only used for JPEG
+  filename: string
+}
+
 export interface CollageState {
   photos: UploadedPhoto[]
   selectedLayoutId: string | null
