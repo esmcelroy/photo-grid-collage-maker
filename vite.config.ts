@@ -16,10 +16,11 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    // DO NOT REMOVE — required by Spark development environment
-    createIconImportProxy() as PluginOption,
-    // Only load Spark plugin in development (causes 405 errors in production)
-    ...(!isProduction ? [sparkPlugin({ port: 5173 }) as PluginOption] : []),
+    // Spark plugins — development only (icon proxy bundles Spark runtime into production otherwise)
+    ...(!isProduction ? [
+      createIconImportProxy() as PluginOption,
+      sparkPlugin({ port: 5173 }) as PluginOption,
+    ] : []),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico'],
