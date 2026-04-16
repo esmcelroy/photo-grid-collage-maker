@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { GridLayout, PhotoPosition, UploadedPhoto, CollageSettings } from '@/lib/types'
+import { getUniqueAreaNames } from '@/lib/layouts'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { ArrowsOutSimple } from '@phosphor-icons/react'
@@ -84,7 +85,7 @@ export function CollagePreview({
           padding: backgroundColor !== 'transparent' ? `${settings.gap}px` : '0',
         }}
       >
-        {layout.areas.map((area) => {
+        {getUniqueAreaNames(layout.areas).map((area) => {
           const photo = getPhotoForArea(area)
           const isDragging = draggedArea === area
           const isDragOver = dragOverArea === area
