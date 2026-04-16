@@ -266,4 +266,85 @@ describe('CollagePreview', () => {
     const areas = Array.from(container.querySelectorAll('[data-grid-area]'))
     expect(areas.map(el => el.getAttribute('data-grid-area'))).toEqual(['a', 'b'])
   })
+
+  // ─── layout parsing ────────────────────────────────────────────────────
+
+  it('parses a gridTemplate with rows / cols format', () => {
+    const threeLayout: GridLayout = {
+      id: '3-top-heavy',
+      name: 'Top Heavy',
+      photoCount: 3,
+      gridTemplate: '2fr 1fr / 1fr 1fr',
+      areas: ['a', 'b', 'c'],
+      aspectRatio: '4/3',
+    }
+    const threePhotos: UploadedPhoto[] = [
+      { id: 'p1', file: new File([''], 'a.jpg', { type: 'image/jpeg' }), dataUrl: 'data:a' },
+      { id: 'p2', file: new File([''], 'b.jpg', { type: 'image/jpeg' }), dataUrl: 'data:b' },
+      { id: 'p3', file: new File([''], 'c.jpg', { type: 'image/jpeg' }), dataUrl: 'data:c' },
+    ]
+    const threePositions: PhotoPosition[] = [
+      { photoId: 'p1', gridArea: 'a' },
+      { photoId: 'p2', gridArea: 'b' },
+      { photoId: 'p3', gridArea: 'c' },
+    ]
+
+    const { container } = render(
+      <CollagePreview
+        layout={threeLayout}
+        photos={threePhotos}
+        photoPositions={threePositions}
+        settings={settings}
+        onPositionsChange={jest.fn()}
+      />
+    )
+    const grid = container.querySelector('[style*="grid-template"]') as HTMLElement
+    expect(grid?.style.gridTemplateRows).toBe('2fr 1fr')
+    expect(grid?.style.gridTemplateColumns).toBe('1fr 1fr')
+  })
+
+  // ─── swap with unaffected positions ────────────────────────────────────
+
+  it('preserves positions of unswapped photos during drag-and-drop', () => {
+    const threeLayout: GridLayout = {
+      id: '3-equal',
+      name: 'Three Equal',
+      photoCount: 3,
+      gridTemplate: '1fr 1fr 1fr',
+      areas: ['a', 'b', 'c'],
+      aspectRatio: '16/9',
+    }
+    const threePhotos: UploadedPhoto[] = [
+      { id: 'p1', file: new File([''], 'a.jpg', { type: 'image/jpeg' }), dataUrl: 'data:a' },
+      { id: 'p2', file: new File([''], 'b.jpg', { type: 'image/jpeg' }), dataUrl: 'data:b' },
+      { id: 'p3', file: new File([''], 'c.jpg', { type: 'image/jpeg' }), dataUrl: 'data:c' },
+    ]
+    const threePositions: PhotoPosition[] = [
+      { photoId: 'p1', gridArea: 'a' },
+      { photoId: 'p2', gridArea: 'b' },
+      { photoId: 'p3', gridArea: 'c' },
+    ]
+
+    const onPositionsChange = jest.fn()
+    const { container } = render(
+      <CollagePreview
+        layout={threeLayout}
+        photos={threePhotos}
+        photoPositions={threePositions}
+        settings={settings}
+        onPositionsChange={onPositionsChange}
+      />
+    )
+
+    const draggable = container.querySelectorAll('[draggable="true"]')
+    fireEvent.dragStart(draggable[0]) // drag p1 from area a
+    fireEvent.dragOver(draggable[1])
+    fireEvent.drop(draggable[1])      // drop on area b
+
+    expect(onPositionsChange).toHaveBeenCalledWith([
+      { photoId: 'p2', gridArea: 'a' },
+      { photoId: 'p1', gridArea: 'b' },
+      { photoId: 'p3', gridArea: 'c' }, // unchanged
+    ])
+  })
 })

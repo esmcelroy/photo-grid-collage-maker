@@ -96,6 +96,7 @@ export function CollagePreview({
 
   // --- Touch drag handlers (mobile) ---
 
+  /* istanbul ignore next -- touch events not supported in jsdom */
   const handleTouchStart = (e: React.TouchEvent, area: string) => {
     const photo = getPhotoForArea(area)
     if (!photo) return
@@ -134,6 +135,7 @@ export function CollagePreview({
     setDraggedArea(area)
   }
 
+  /* istanbul ignore next -- touch events not supported in jsdom */
   const handleTouchMove = (e: React.TouchEvent) => {
     const state = touchDragRef.current
     if (!state) return
@@ -160,6 +162,7 @@ export function CollagePreview({
     setDragOverArea(gridCell?.dataset.gridArea ?? null)
   }
 
+  /* istanbul ignore next -- touch events not supported in jsdom */
   const handleTouchEnd = () => {
     const state = touchDragRef.current
     if (state) {
