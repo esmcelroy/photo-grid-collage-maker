@@ -4,6 +4,8 @@
 
 Collage Maker is a browser-based tool for composing photo grid collages. Upload 1–9 photos, pick a layout, tweak spacing and style, and export a high-quality PNG — all without leaving the browser.
 
+**Fully client-side** — no server required. Your photos never leave your device. Installable as a PWA for offline use.
+
 ---
 
 ## Features
@@ -14,6 +16,8 @@ Collage Maker is a browser-based tool for composing photo grid collages. Upload 
 - **Drag-and-Drop Reordering** — swap photo positions within the grid by dragging thumbnails
 - **Customization Controls** — adjust gap/spacing, background color, and border radius via sliders and color pickers
 - **High-Quality Export** — download the finished collage as a PNG via `html2canvas`
+- **Offline Support** — installable PWA with service worker caching
+- **Local Storage** — all data persists in IndexedDB; nothing sent to any server
 
 ---
 
@@ -28,9 +32,10 @@ Collage Maker is a browser-based tool for composing photo grid collages. Upload 
 | Animation | Framer Motion |
 | Icons | @phosphor-icons/react |
 | Export | html2canvas |
-| Data Fetching | @tanstack/react-query |
+| State | @tanstack/react-query |
+| Storage | Dexie.js (IndexedDB) |
 | Toasts | sonner |
-| State Persistence | `@github/spark` `useKV` *(temporary — see Development Notes)* |
+| Deployment | GitHub Pages |
 
 ---
 
@@ -47,12 +52,14 @@ src/
 │   ├── CollagePreview    # Live large-format collage preview
 │   └── CustomizationControls  # Gap, background, border radius controls
 ├── lib/
+│   ├── db.ts             # Dexie.js database (IndexedDB persistence)
 │   ├── image-utils.ts    # Image loading, resizing, and processing helpers
 │   ├── layouts.ts        # Layout definitions and photo-count mapping
 │   ├── types.ts          # Shared TypeScript types
 │   └── utils.ts          # General utility functions
 └── hooks/
-    └── use-mobile.ts     # Responsive breakpoint detection hook
+    ├── useCollageApi.ts   # React Query + Dexie state management
+    └── use-mobile.ts      # Responsive breakpoint detection hook
 ```
 
 ---
@@ -72,15 +79,27 @@ npm run dev
 Other scripts:
 
 ```bash
-npm run build      # TypeScript check + production build
-npm run preview    # Preview the production build locally
-npm run lint       # Run ESLint
+npm run build          # TypeScript check + production build
+npm run preview        # Preview the production build locally
+npm run lint           # Run ESLint
+npm test               # Run Jest unit tests
+npm run test:ui        # Run Playwright e2e tests
 ```
 
 ---
 
-## Development Notes
+## Deployment
 
-**Current phase:** Initial wireframing with active feature buildout.
+The app automatically deploys to GitHub Pages on push to `main` via the `.github/workflows/deploy.yml` workflow.
 
-**State persistence:** Photo data, layout selections, and settings are currently stored using the `@github/spark` `useKV` hook. This is a temporary solution for early development. Migration to a proper backend storage layer is planned as the project matures.
+To build for GitHub Pages manually:
+
+```bash
+GITHUB_PAGES=true npm run build
+```
+
+---
+
+## Architecture Notes
+
+All state lives in the browser. Photos are stored as data URLs in IndexedDB via Dexie.js. React Query manages the cache layer, with Dexie as the persistence backend. The storage layer uses an adapter pattern, so cloud sync could be added in the future without rewriting the UI layer.

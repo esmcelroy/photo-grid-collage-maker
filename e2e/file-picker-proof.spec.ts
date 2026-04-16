@@ -21,9 +21,8 @@ import { AppPage } from './pages/app.page'
 test.describe('File-Picker Upload Proof', () => {
   let app: AppPage
 
-  test.beforeEach(async ({ page, request }) => {
-    app = new AppPage(page, request)
-    await app.clearState()
+  test.beforeEach(async ({ page }) => {
+    app = new AppPage(page)
     await app.goto()
   })
 
@@ -65,7 +64,7 @@ test.describe('File-Picker Upload Proof', () => {
       'test-image.jpg',
       'test-image-2.jpg',
       'test-photo.jpg',
-      'test-image.jpg', // Reuse for demo (in real scenario, would have 9 distinct images)
+      'test-image.jpg',
       'test-image-2.jpg',
       'test-photo.jpg',
       'test-image.jpg',
@@ -82,16 +81,14 @@ test.describe('File-Picker Upload Proof', () => {
     const countBefore = await app.getCurrentPhotoCount()
     expect(countBefore).toBe(9)
 
-    // Verify upload zone is visually disabled/hidden at capacity
+    // Verify upload zone is hidden at capacity
     await app.assertUploadLimitEnforced()
 
-    // At capacity the upload zone is removed from the DOM, so the label
-    // and file input no longer exist. Confirm no upload control is present.
+    // The upload label should not be visible at 9/9
     const uploadLabel = page.locator('label[for="photo-upload"]')
-    const labelVisible = await uploadLabel.isVisible().catch(() => false)
-    expect(labelVisible).toBe(false)
+    await expect(uploadLabel).not.toBeVisible()
 
-    // Photo count must remain at 9 (no state mutation)
+    // Count should remain at 9
     const countAfter = await app.getCurrentPhotoCount()
     expect(countAfter).toBe(9)
 

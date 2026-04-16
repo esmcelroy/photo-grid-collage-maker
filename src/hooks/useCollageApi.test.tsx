@@ -1,16 +1,29 @@
 /**
  * useCollageApi — unit tests
  *
- * Tests confirm the correct fetch calls are made for each action.
- * Server-level behavior is tested at the API layer; here we verify
- * the hook wires the right HTTP verbs, URLs, and request bodies.
+ * Tests confirm the correct Dexie database operations are invoked for each action.
+ * The hook is backed by IndexedDB (via Dexie) instead of a REST API.
  */
 
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import React from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useCollageApi } from '@/hooks/useCollageApi'
+
+// Mock the Dexie database module before importing the hook
+jest.unstable_mockModule('@/lib/db', () => ({
+  createCollage: jest.fn(),
+  getCollageState: jest.fn(),
+  updateCollage: jest.fn(),
+  addPhoto: jest.fn(),
+  removePhoto: jest.fn(),
+  deleteCollage: jest.fn(),
+  db: {},
+}))
+
+// Dynamic imports after mock registration (ESM requirement)
+const collageDb = await import('@/lib/db')
+const { useCollageApi } = await import('@/hooks/useCollageApi')
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -18,7 +31,6 @@ import { useCollageApi } from '@/hooks/useCollageApi'
 
 const SESSION_KEY = 'collage-session-id'
 
-/** Create a fresh QueryClient per test — prevents cross-test cache pollution. */
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -37,22 +49,12 @@ function createWrapper() {
   return { wrapper: Wrapper, queryClient }
 }
 
-/** Minimal API response that satisfies the CollageState shape. */
-const mockServerState = {
+const mockCollageState = {
   id: 'test-session-id',
   photos: [{ id: 'photo-1', fileName: 'test.jpg', dataUrl: 'data:image/jpeg;base64,abc' }],
   selectedLayoutId: 'layout-1',
   photoPositions: [{ photoId: 'photo-1', gridArea: 'photo1' }],
   settings: { gap: 8, backgroundColor: '#ffffff', borderRadius: 0 },
-}
-
-/** Build a minimal fetch mock response. */
-function mockResponse(body: unknown, ok = true): Response {
-  return {
-    ok,
-    status: ok ? 200 : 500,
-    json: async () => body,
-  } as unknown as Response
 }
 
 // ---------------------------------------------------------------------------
@@ -62,19 +64,12 @@ function mockResponse(body: unknown, ok = true): Response {
 describe('useCollageApi', () => {
   beforeEach(() => {
     localStorage.clear()
-    // Replace the global fetch with a jest mock before every test.
-    // Cast through unknown so TypeScript accepts the assignment; tests use
-    // jest.MockedFunction<typeof fetch> to get the correctly-typed mock API.
-    global.fetch = jest.fn() as unknown as typeof fetch
+    jest.clearAllMocks()
   })
 
   afterEach(() => {
     localStorage.clear()
   })
-
-  // -------------------------------------------------------------------------
-  // Default state — no session in localStorage
-  // -------------------------------------------------------------------------
 
   describe('when no session exists', () => {
     it('returns empty default values before any session is initialized', () => {
@@ -92,24 +87,20 @@ describe('useCollageApi', () => {
       })
     })
 
-    it('does not call fetch when no session ID is present', () => {
+    it('does not call getCollageState when no session ID is present', () => {
       const { wrapper } = createWrapper()
       renderHook(() => useCollageApi(), { wrapper })
 
-      expect(global.fetch).not.toHaveBeenCalled()
+      expect(collageDb.getCollageState).not.toHaveBeenCalled()
     })
   })
 
-  // -------------------------------------------------------------------------
-  // initCollage
-  // -------------------------------------------------------------------------
-
   describe('initCollage', () => {
-    it('calls POST /api/collages and stores the returned id in localStorage', async () => {
-      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>
-      mockFetch.mockResolvedValueOnce(mockResponse({ id: 'new-session-id' }))
-      // After setSessionId the query key changes and a GET fires — stub it
-      mockFetch.mockResolvedValueOnce(mockResponse({ ...mockServerState, id: 'new-session-id' }))
+    it('calls createCollage and stores the returned id in localStorage', async () => {
+      ;(collageDb.createCollage as jest.MockedFunction<typeof collageDb.createCollage>)
+        .mockResolvedValueOnce({ id: 'new-session-id' })
+      ;(collageDb.getCollageState as jest.MockedFunction<typeof collageDb.getCollageState>)
+        .mockResolvedValue({ ...mockCollageState, id: 'new-session-id' })
 
       const { wrapper } = createWrapper()
       const { result } = renderHook(() => useCollageApi(), { wrapper })
@@ -122,32 +113,22 @@ describe('useCollageApi', () => {
         expect(localStorage.getItem(SESSION_KEY)).toBe('new-session-id')
       })
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/collages', { method: 'POST' })
+      expect(collageDb.createCollage).toHaveBeenCalled()
     })
   })
 
-  // -------------------------------------------------------------------------
-  // addPhoto
-  // -------------------------------------------------------------------------
-
   describe('addPhoto', () => {
-    it('calls POST /api/collages/:id/photos with the photo payload', async () => {
+    it('calls addPhoto with the correct collageId and photo payload', async () => {
       localStorage.setItem(SESSION_KEY, 'test-session-id')
 
-      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>
-      // Initial GET on mount
-      mockFetch.mockResolvedValueOnce(mockResponse(mockServerState))
-      // POST new photo
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({ id: 'photo-2', fileName: 'new.jpg', dataUrl: 'data:image/jpeg;base64,xyz' })
-      )
-      // Refetch after invalidation
-      mockFetch.mockResolvedValueOnce(mockResponse(mockServerState))
+      ;(collageDb.getCollageState as jest.MockedFunction<typeof collageDb.getCollageState>)
+        .mockResolvedValue(mockCollageState)
+      ;(collageDb.addPhoto as jest.MockedFunction<typeof collageDb.addPhoto>)
+        .mockResolvedValueOnce({ id: 'photo-2', fileName: 'new.jpg', dataUrl: 'data:image/jpeg;base64,xyz' })
 
       const { wrapper } = createWrapper()
       const { result } = renderHook(() => useCollageApi(), { wrapper })
 
-      // Wait for initial load to settle
       await waitFor(() => expect(result.current.isLoading).toBe(false))
 
       await act(async () => {
@@ -158,35 +139,24 @@ describe('useCollageApi', () => {
         })
       })
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/collages/test-session-id/photos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: 'photo-2',
-          dataUrl: 'data:image/jpeg;base64,xyz',
-          fileName: 'new.jpg',
-        }),
+      expect(collageDb.addPhoto).toHaveBeenCalledWith('test-session-id', {
+        id: 'photo-2',
+        dataUrl: 'data:image/jpeg;base64,xyz',
+        fileName: 'new.jpg',
       })
     })
   })
 
-  // -------------------------------------------------------------------------
-  // updateSettings
-  // -------------------------------------------------------------------------
-
   describe('updateSettings', () => {
-    it('calls PATCH /api/collages/:id with settings in the request body', async () => {
+    it('calls updateCollage with settings', async () => {
       localStorage.setItem(SESSION_KEY, 'test-session-id')
 
       const updatedSettings = { gap: 16, backgroundColor: '#000000', borderRadius: 4 }
 
-      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>
-      // Initial GET on mount
-      mockFetch.mockResolvedValueOnce(mockResponse(mockServerState))
-      // PATCH settings
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({ ...mockServerState, settings: updatedSettings })
-      )
+      ;(collageDb.getCollageState as jest.MockedFunction<typeof collageDb.getCollageState>)
+        .mockResolvedValue(mockCollageState)
+      ;(collageDb.updateCollage as jest.MockedFunction<typeof collageDb.updateCollage>)
+        .mockResolvedValueOnce({ ...mockCollageState, settings: updatedSettings })
 
       const { wrapper } = createWrapper()
       const { result } = renderHook(() => useCollageApi(), { wrapper })
@@ -197,24 +167,18 @@ describe('useCollageApi', () => {
         await result.current.updateSettings(updatedSettings)
       })
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/collages/test-session-id', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: updatedSettings }),
+      expect(collageDb.updateCollage).toHaveBeenCalledWith('test-session-id', {
+        settings: updatedSettings,
       })
     })
   })
 
-  // -------------------------------------------------------------------------
-  // Error handling
-  // -------------------------------------------------------------------------
-
   describe('error handling', () => {
-    it('exposes an error when the collage fetch returns a non-ok response', async () => {
+    it('exposes an error when getCollageState throws', async () => {
       localStorage.setItem(SESSION_KEY, 'test-session-id')
 
-      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>
-      mockFetch.mockResolvedValueOnce(mockResponse({}, false /* ok = false */))
+      ;(collageDb.getCollageState as jest.MockedFunction<typeof collageDb.getCollageState>)
+        .mockRejectedValue(new Error('Collage not found'))
 
       const { wrapper } = createWrapper()
       const { result } = renderHook(() => useCollageApi(), { wrapper })

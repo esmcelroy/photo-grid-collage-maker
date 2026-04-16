@@ -1,7 +1,7 @@
-import { Page, expect, APIRequestContext } from '@playwright/test'
+import { Page } from '@playwright/test'
 import * as path from 'path'
 
-// Get __dirname equivalent for ESM modules
+import { expect } from '@playwright/test'
 const __dirname = new URL('.', import.meta.url).pathname
 
 /**
@@ -10,17 +10,16 @@ const __dirname = new URL('.', import.meta.url).pathname
  */
 export class AppPage {
   constructor(
-    private page: Page,
-    private request: APIRequestContext
+    private page: Page
   ) {}
 
   /**
-   * Navigate to the app home page and wait for session initialization.
+   * Navigate to the app home page and wait for the session to initialize.
    */
   async goto() {
     await this.page.goto('/')
-    await this.page.waitForLoadState('networkidle')
-    // Ensure the collage session has been created before proceeding
+    await this.page.waitForLoadState('domcontentloaded')
+    // Wait for the collage session to be initialized in localStorage
     await this.page.waitForFunction(
       () => localStorage.getItem('collage-session-id') !== null,
       { timeout: 10000 }
@@ -28,20 +27,33 @@ export class AppPage {
   }
 
   /**
-   * Clear the Spark KV store state for a clean test environment.
-   * This resets all collage session data so tests start from empty state.
+   * Clear browser state for a clean test environment.
+   * NOTE: Playwright creates a fresh BrowserContext per test, so localStorage
+   * and IndexedDB are already clean. This method is kept for explicit cleanup
+   * in tests that need to reset mid-test (e.g., testing "clear all").
    */
   async clearState() {
-    for (const key of [
-      'collage-photos',
-      'selected-layout',
-      'photo-positions',
-      'collage-settings',
-    ]) {
-      await this.request.delete(`/_spark/kv/${encodeURIComponent(key)}`).catch(() => {
-        // KV endpoint may not exist in all environments; ignore errors silently
-      })
-    }
+    // In most cases, the fresh context handles cleanup.
+    // For mid-test resets, clear storage and reload.
+    await this.page.evaluate(async () => {
+      localStorage.clear()
+      const dbs = await indexedDB.databases()
+      await Promise.all(
+        dbs.map(
+          (db) =>
+            new Promise<void>((resolve) => {
+              if (!db.name) {
+                resolve()
+                return
+              }
+              const req = indexedDB.deleteDatabase(db.name)
+              req.onsuccess = () => resolve()
+              req.onerror = () => resolve()
+              req.onblocked = () => resolve()
+            })
+        )
+      )
+    })
   }
 
   /**
@@ -78,6 +90,7 @@ export class AppPage {
    */
   async uploadViaHiddenInput(filePaths: string[]) {
     const fileInput = this.page.locator('input[type="file"]')
+    await fileInput.waitFor({ state: 'attached', timeout: 10000 })
     const absolutePaths = filePaths.map(filePath =>
       path.join(__dirname, '../fixtures', filePath)
     )
@@ -147,18 +160,13 @@ export class AppPage {
 
   /**
    * Assert that upload above the 9-photo limit is rejected.
-   * Used to test boundary behavior when at capacity.
+   * At capacity (9/9), the upload zone is hidden and replaced by the photo grid.
    */
   async assertUploadLimitEnforced() {
-    // At 9 photos the upload zone is removed from the DOM entirely,
-    // confirming the limit is enforced. If it's still visible, check for
-    // a disabled visual state as a fallback.
-    const uploadZone = this.page.locator('[class*="border-dashed"]')
-    const isVisible = await uploadZone.isVisible().catch(() => false)
-    if (isVisible) {
-      await expect(uploadZone).toHaveClass(/opacity-50|pointer-events-none/)
-    }
-    // Upload zone absent = limit is enforced (valid behavior)
+    // At 9 photos, the upload zone should not be visible
+    await expect(this.page.getByText('Upload Photos')).not.toBeVisible()
+    // The photo count badge should show 9/9
+    await this.assertPhotoCountBadge(9)
   }
 
   /**

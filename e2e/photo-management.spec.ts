@@ -4,9 +4,8 @@ import { AppPage } from './pages/app.page'
 test.describe('Photo Management', () => {
   let app: AppPage
 
-  test.beforeEach(async ({ page, request }) => {
-    app = new AppPage(page, request)
-    await app.clearState()
+  test.beforeEach(async ({ page }) => {
+    app = new AppPage(page)
     await app.goto()
   })
 
