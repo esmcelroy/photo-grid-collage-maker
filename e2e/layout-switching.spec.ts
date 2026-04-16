@@ -4,9 +4,8 @@ import { AppPage } from './pages/app.page'
 test.describe('Layout Switching', () => {
   let app: AppPage
 
-  test.beforeEach(async ({ page, request }) => {
-    app = new AppPage(page, request)
-    await app.clearState()
+  test.beforeEach(async ({ page }) => {
+    app = new AppPage(page)
     await app.goto()
     await app.uploadViaFileChooser(['test-image.jpg', 'test-image-2.jpg'])
     // Wait for layout gallery to be ready before each test

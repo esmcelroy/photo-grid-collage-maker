@@ -1,0 +1,16 @@
+{
+  "areas": [
+    {
+      "name": "server",
+      "applyTo": "server/**"
+    },
+    {
+      "name": "e2e",
+      "applyTo": "e2e/**"
+    },
+    {
+      "name": "src",
+      "applyTo": "src/**"
+    }
+  ]
+}
