@@ -1,3 +1,4 @@
+import '@testing-library/jest-dom/jest-globals'
 import { jest, describe, it, expect, beforeEach } from '@jest/globals'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ExportDialog } from '@/components/ExportDialog'
