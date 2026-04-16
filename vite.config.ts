@@ -54,6 +54,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Exclude large WASM-based chunks from precache (loaded on demand)
+        globIgnores: ['**/libheif-js-*.js'],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
       },
     }) as PluginOption,
   ],
