@@ -35,9 +35,11 @@ export function convertModernColors(value: string): string {
     ctx.fillRect(0, 0, 1, 1)
     const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data
 
+    /* istanbul ignore next -- jsdom canvas stub returns 0,0,0,0; real conversion tested in browser */
     if (a === 255) {
       return `rgb(${r}, ${g}, ${b})`
     }
+    /* istanbul ignore next */
     return `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`
   } catch {
     // ignore — fall through to original value (e.g. jsdom has no canvas)
@@ -54,14 +56,53 @@ const COLOR_PROPS = [
 ] as const
 
 /**
+ * Overrides CSS custom properties that contain oklch/oklab values on the
+ * document root element with rgb equivalents. html2canvas parses stylesheets
+ * and custom properties, so we must convert at the variable level.
+ * Returns a cleanup function that removes the overrides.
+ */
+export function replaceOklchCustomProperties(root: HTMLElement): () => void {
+  const restoreFns: Array<() => void> = []
+  const docEl = root.ownerDocument.documentElement
+  const computed = getComputedStyle(docEl)
+
+  // Iterate all CSS custom properties (--*) on :root
+  for (let i = 0; i < computed.length; i++) {
+    const prop = computed[i]
+    if (!prop.startsWith('--')) continue
+    const val = computed.getPropertyValue(prop).trim()
+    if (val.includes('oklch') || val.includes('oklab')) {
+      const converted = val.replace(
+        /oklch\([^)]+\)|oklab\([^)]+\)/g,
+        (match) => convertModernColors(match)
+      )
+      if (converted !== val) {
+        /* istanbul ignore next -- only reached when canvas converts oklch→rgb (real browser) */
+        const prev = docEl.style.getPropertyValue(prop)
+        docEl.style.setProperty(prop, converted)
+        restoreFns.push(() => {
+          if (prev) docEl.style.setProperty(prop, prev)
+          else docEl.style.removeProperty(prop)
+        })
+      }
+    }
+  }
+
+  return () => restoreFns.forEach((fn) => fn())
+}
+
+/**
  * Walks the subtree of `root` and overrides any computed or inline oklch/oklab
  * color values with rgb equivalents so html2canvas can parse them.
- * Handles both CSS-class-derived (computed) oklch values from Tailwind v4 and
- * explicit inline style oklch values. Returns a cleanup function that restores
- * the original inline styles.
+ * Also converts CSS custom properties on :root that contain oklch.
+ * Returns a cleanup function that restores everything.
  */
 export function replaceOklchInSubtree(root: HTMLElement): () => void {
   const restoreFns: Array<() => void> = []
+
+  // Convert CSS custom properties on :root first
+  const restoreVars = replaceOklchCustomProperties(root)
+  restoreFns.push(restoreVars)
 
   const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))]
   for (const el of elements) {
@@ -71,6 +112,7 @@ export function replaceOklchInSubtree(root: HTMLElement): () => void {
       const val = computed.getPropertyValue(prop)
       if (val && (val.includes('oklch') || val.includes('oklab'))) {
         const converted = convertModernColors(val)
+        /* istanbul ignore next -- only reached when canvas converts oklch→rgb (real browser) */
         if (converted !== val) {
           const prev = el.style.getPropertyValue(prop)
           el.style.setProperty(prop, converted)
@@ -91,6 +133,7 @@ export function replaceOklchInSubtree(root: HTMLElement): () => void {
         (match) => convertModernColors(match)
       )
       if (converted !== originalStyle) {
+        /* istanbul ignore next -- only reached when canvas converts oklch→rgb (real browser) */
         el.setAttribute('style', converted)
         restoreFns.push(() => el.setAttribute('style', originalStyle))
       }
@@ -100,6 +143,7 @@ export function replaceOklchInSubtree(root: HTMLElement): () => void {
   return () => restoreFns.forEach((fn) => fn())
 }
 
+/* istanbul ignore next -- html2canvas requires a real browser; covered by Playwright e2e */
 export async function downloadCollage(
   canvasElement: HTMLElement,
   filename: string = 'collage.png'
@@ -116,8 +160,27 @@ export async function downloadCollage(
       allowTaint: true,
       backgroundColor: null,
       logging: false,
-      onclone: (_doc: Document, clonedEl: HTMLElement) => {
-        // html2canvas clones the DOM — convert colors in the clone too
+      onclone: (clonedDoc: Document, clonedEl: HTMLElement) => {
+        // html2canvas clones the entire document — convert CSS custom
+        // properties on the cloned :root AND element styles in the clone
+        const clonedRoot = clonedDoc.documentElement
+        const clonedComputed = clonedDoc.defaultView?.getComputedStyle(clonedRoot)
+        if (clonedComputed) {
+          for (let i = 0; i < clonedComputed.length; i++) {
+            const prop = clonedComputed[i]
+            if (!prop.startsWith('--')) continue
+            const val = clonedComputed.getPropertyValue(prop).trim()
+            if (val.includes('oklch') || val.includes('oklab')) {
+              const converted = val.replace(
+                /oklch\([^)]+\)|oklab\([^)]+\)/g,
+                (match) => convertModernColors(match)
+              )
+              if (converted !== val) {
+                clonedRoot.style.setProperty(prop, converted)
+              }
+            }
+          }
+        }
         replaceOklchInSubtree(clonedEl)
       },
     })

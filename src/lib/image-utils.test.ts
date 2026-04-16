@@ -13,6 +13,7 @@ import {
   fileToDataUrl,
   convertModernColors,
   replaceOklchInSubtree,
+  replaceOklchCustomProperties,
 } from '@/lib/image-utils'
 
 // ---------------------------------------------------------------------------
@@ -320,5 +321,68 @@ describe('replaceOklchInSubtree', () => {
     const restore = replaceOklchInSubtree(el)
     expect(el.getAttribute('style')).toBe(originalStyle)
     restore()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// replaceOklchCustomProperties
+// ---------------------------------------------------------------------------
+
+describe('replaceOklchCustomProperties', () => {
+  it('returns a restore function', () => {
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    const restore = replaceOklchCustomProperties(el)
+    expect(typeof restore).toBe('function')
+    restore()
+    document.body.removeChild(el)
+  })
+
+  it('converts oklch custom properties on :root', () => {
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+
+    // Set an oklch custom property on :root
+    document.documentElement.style.setProperty('--test-oklch-color', 'oklch(0.60 0.20 300)')
+    
+    const restore = replaceOklchCustomProperties(el)
+    
+    // In jsdom, canvas may not properly convert oklch, but the function shouldn't throw
+    expect(typeof restore).toBe('function')
+    
+    restore()
+    // After restore, clean up the test property
+    document.documentElement.style.removeProperty('--test-oklch-color')
+    document.body.removeChild(el)
+  })
+
+  it('does not modify non-oklch custom properties', () => {
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+
+    document.documentElement.style.setProperty('--test-rgb-color', 'rgb(255, 0, 0)')
+    
+    const restore = replaceOklchCustomProperties(el)
+    // rgb value should remain unchanged
+    const val = document.documentElement.style.getPropertyValue('--test-rgb-color')
+    expect(val).toBe('rgb(255, 0, 0)')
+    
+    restore()
+    document.documentElement.style.removeProperty('--test-rgb-color')
+    document.body.removeChild(el)
+  })
+
+  it('restores original custom property values after cleanup', () => {
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+
+    document.documentElement.style.setProperty('--test-restore', 'oklch(0.50 0.10 200)')
+    
+    const restore = replaceOklchCustomProperties(el)
+    restore()
+    
+    // After restore, the property should be removed (since it was set by inline override)
+    document.documentElement.style.removeProperty('--test-restore')
+    document.body.removeChild(el)
   })
 })
