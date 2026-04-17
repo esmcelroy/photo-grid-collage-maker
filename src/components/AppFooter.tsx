@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -29,10 +30,12 @@ export function AppFooter() {
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle className="text-xl">About Collage Maker</DialogTitle>
+                <DialogDescription>
+                  A free, privacy-first photo collage builder that runs entirely in your browser.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 text-sm text-muted-foreground">
                 <p>
-                  A free, privacy-first photo collage builder that runs entirely in your browser.
                   No uploads to any server — your photos never leave your device.
                 </p>
 
