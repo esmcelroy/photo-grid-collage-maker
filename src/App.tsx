@@ -13,6 +13,7 @@ import { ExportDialog } from '@/components/ExportDialog'
 import { PhotoEditDialog } from '@/components/PhotoEditDialog'
 import { ArrangementCarousel } from '@/components/ArrangementCarousel'
 import { ComparePanel } from '@/components/ComparePanel'
+import { AppFooter } from '@/components/AppFooter'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -424,6 +425,8 @@ function App() {
           onApply={handleApplyEdit}
         />
       )}
+
+      <AppFooter />
     </div>
   )
 }
