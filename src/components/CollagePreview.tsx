@@ -216,7 +216,7 @@ export function CollagePreview({
     <Card className="p-6">
       <div
         ref={previewRef}
-        className="w-full mx-auto rounded-lg overflow-hidden"
+        className={cn("w-full mx-auto", settings.borderRadius > 0 && "overflow-hidden")}
         style={{
           aspectRatio: layout.aspectRatio || '1/1',
           display: 'grid',
@@ -226,6 +226,7 @@ export function CollagePreview({
           gap: `${settings.gap}px`,
           backgroundColor,
           padding: backgroundColor !== 'transparent' ? `${settings.gap}px` : '0',
+          borderRadius: `${settings.borderRadius}px`,
         }}
       >
         {getUniqueAreaNames(layout.areas).map((area) => {

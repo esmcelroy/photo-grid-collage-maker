@@ -98,6 +98,24 @@ describe('CollagePreview', () => {
     )
     const grid = container.querySelector('[style*="gap"]') as HTMLElement
     expect(grid?.style.gap).toBe('16px')
+    expect(grid?.style.borderRadius).toBe('8px')
+    expect(grid?.classList.contains('overflow-hidden')).toBe(true)
+  })
+
+  it('applies sharp corners and no overflow-hidden when borderRadius is 0', () => {
+    const { container } = render(
+      <CollagePreview
+        layout={layout}
+        photos={[]}
+        photoPositions={[]}
+        settings={{ ...settings, borderRadius: 0 }}
+        onPositionsChange={jest.fn()}
+      />
+    )
+    const grid = container.querySelector('[style*="grid-template"]') as HTMLElement
+    expect(grid?.style.borderRadius).toBe('0px')
+    expect(grid?.classList.contains('overflow-hidden')).toBe(false)
+    expect(grid?.classList.contains('rounded-lg')).toBe(false)
   })
 
   it('only marks cells with assigned photos as draggable', () => {
