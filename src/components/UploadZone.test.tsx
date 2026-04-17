@@ -1,6 +1,7 @@
 import { jest } from '@jest/globals'
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { axe } from 'jest-axe'
 import { UploadZone } from '@/components/UploadZone'
 import { MAX_PHOTOS } from '@/lib/types'
 
@@ -143,5 +144,11 @@ describe('UploadZone', () => {
     await userEvent.upload(input, pdf)
 
     expect(onFilesSelected).not.toHaveBeenCalled()
+  })
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<UploadZone onFilesSelected={jest.fn()} />)
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
   })
 })

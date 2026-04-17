@@ -67,6 +67,7 @@ UploadZone › calls onFilesSelected when valid images are dropped
 The project now includes:
 
 - **Unit/Integration:** Jest + React Testing Library (`jest.config.ts`, `src/__tests__/setup.ts`)
+- **Accessibility:** jest-axe for automated WCAG compliance checks
 - **API (future):** Jest + Supertest
 - **E2E:** Playwright (`playwright.config.ts`, `e2e/journeys/`, `e2e/pages/`, `e2e/fixtures/`)
 
@@ -379,6 +380,49 @@ src/
 | Unit / integration (React) | `.test.tsx` |
 | Unit / integration (TS only) | `.test.ts` |
 | Playwright E2E | `.spec.ts` |
+
+---
+
+## Accessibility Testing (jest-axe)
+
+Every component that renders interactive or structural UI should include an automated accessibility check using `jest-axe`. This catches WCAG violations (missing labels, color contrast, heading order, etc.) before they reach production.
+
+### Pattern
+
+```typescript
+import { axe } from 'jest-axe'
+
+it('has no accessibility violations', async () => {
+  const { container } = render(<MyComponent {...requiredProps} />)
+  const results = await axe(container)
+  expect(results).toHaveNoViolations()
+})
+```
+
+### Guidelines
+
+- Add a `toHaveNoViolations()` test to every new component test file
+- The `jest-axe/extend-expect` import in `src/__tests__/setup.ts` makes `toHaveNoViolations` available globally
+- If a violation is intentional (e.g., decorative images with `alt=""`), configure axe rules to exclude it:
+  ```typescript
+  const results = await axe(container, {
+    rules: { 'image-alt': { enabled: false } }
+  })
+  ```
+- Accessibility tests complement (but do not replace) manual screen reader testing and Lighthouse audits
+
+### Components with a11y tests
+
+| Component | File |
+|---|---|
+| UploadZone | `src/components/UploadZone.test.tsx` |
+| CollagePreview | `src/components/CollagePreview.test.tsx` |
+| LayoutGallery | `src/components/LayoutGallery.test.tsx` |
+| AppFooter | `src/components/AppFooter.test.tsx` |
+
+### Signoff Requirement
+
+**All new features must pass a jest-axe accessibility check before merge.** This is enforced by including `toHaveNoViolations()` in the component's test suite. Lighthouse accessibility score must remain at 100.
 
 ---
 

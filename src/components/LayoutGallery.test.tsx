@@ -1,7 +1,8 @@
 import React from 'react'
 import { jest } from '@jest/globals'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { axe } from 'jest-axe'
 import { LayoutGallery } from '@/components/LayoutGallery'
 
 // Radix ScrollArea doesn't work reliably in jsdom — render children directly
@@ -36,10 +37,17 @@ const mockLayouts = [
   },
 ]
 
+const defaultPanelProps = {
+  showCarousel: false,
+  onToggleCarousel: jest.fn(),
+  compareIds: [] as string[],
+  onToggleCompare: jest.fn(),
+}
+
 describe('LayoutGallery', () => {
   it('shows empty state when no layouts are available', () => {
     render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
         layouts={[]}
         photos={[]}
         photoPositions={[]}
@@ -52,7 +60,7 @@ describe('LayoutGallery', () => {
 
   it('shows "Layout Options" heading when layouts are present', () => {
     render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
         layouts={mockLayouts}
         photos={[]}
         photoPositions={[]}
@@ -65,7 +73,7 @@ describe('LayoutGallery', () => {
 
   it('shows the layout count', () => {
     render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
         layouts={mockLayouts}
         photos={[]}
         photoPositions={[]}
@@ -78,7 +86,7 @@ describe('LayoutGallery', () => {
 
   it('renders a card for each layout', () => {
     render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
         layouts={mockLayouts}
         photos={[]}
         photoPositions={[]}
@@ -95,7 +103,7 @@ describe('LayoutGallery', () => {
     const onLayoutSelect = jest.fn()
     const user = userEvent.setup()
     render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
         layouts={mockLayouts}
         photos={[]}
         photoPositions={[]}
@@ -113,7 +121,7 @@ describe('LayoutGallery', () => {
 
   it('shows singular "1 layout" text when only one layout is available', () => {
     render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
         layouts={[mockLayouts[0]]}
         photos={[]}
         photoPositions={[]}
@@ -133,7 +141,7 @@ describe('LayoutGallery', () => {
     const positions = [{ photoId: 'photo-1', gridArea: 'photo1' }]
 
     const { container } = render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
         layouts={[mockLayouts[0]]}
         photos={[photo]}
         photoPositions={positions}
@@ -150,7 +158,7 @@ describe('LayoutGallery', () => {
 
   it('marks the selected layout with a visual indicator', () => {
     render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
         layouts={mockLayouts}
         photos={[]}
         photoPositions={[]}
@@ -166,7 +174,7 @@ describe('LayoutGallery', () => {
 
   it('renders a shuffle button', () => {
     render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
         layouts={mockLayouts}
         photos={[]}
         photoPositions={[]}
@@ -181,7 +189,7 @@ describe('LayoutGallery', () => {
     const onLayoutSelect = jest.fn()
     const user = userEvent.setup()
     render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
         layouts={mockLayouts}
         photos={[]}
         photoPositions={[]}
@@ -203,7 +211,7 @@ describe('LayoutGallery', () => {
     // Only two layouts so the shuffle MUST pick the other one
     const twoLayouts = mockLayouts.slice(0, 2)
     render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
         layouts={twoLayouts}
         photos={[]}
         photoPositions={[]}
@@ -221,7 +229,7 @@ describe('LayoutGallery', () => {
 
   it('renders a compare button', () => {
     render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
         layouts={mockLayouts}
         photos={[]}
         photoPositions={[]}
@@ -233,75 +241,97 @@ describe('LayoutGallery', () => {
   })
 
   it('enters comparison mode when compare button is clicked', async () => {
+    const onToggleCompare = jest.fn()
     const user = userEvent.setup()
     render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
         layouts={mockLayouts}
         photos={[]}
         photoPositions={[]}
         selectedLayoutId="2-horizontal"
         onLayoutSelect={jest.fn()}
+        onToggleCompare={onToggleCompare}
       />
     )
 
     await user.click(screen.getByTitle('Compare layouts'))
-
-    expect(screen.getByText(/Comparing 1\/3 layouts/)).toBeInTheDocument()
+    expect(onToggleCompare).toHaveBeenCalledWith('2-horizontal')
   })
 
-  it('adds layouts to comparison when clicking in compare mode', async () => {
+  it('calls onToggleCompare with layout id when clicking layout in compare mode', async () => {
+    const onToggleCompare = jest.fn()
     const user = userEvent.setup()
     render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
         layouts={mockLayouts}
         photos={[]}
         photoPositions={[]}
         selectedLayoutId="2-horizontal"
         onLayoutSelect={jest.fn()}
+        compareIds={['2-horizontal']}
+        onToggleCompare={onToggleCompare}
       />
     )
 
-    // Enter compare mode
-    await user.click(screen.getByTitle('Compare layouts'))
-    expect(screen.getByText(/Comparing 1\/3 layouts/)).toBeInTheDocument()
-
-    // Click another layout to add it
+    // In compare mode, clicking a layout toggles it
     await user.click(screen.getByText('Stacked'))
-    expect(screen.getByText(/Comparing 2\/3 layouts/)).toBeInTheDocument()
+    expect(onToggleCompare).toHaveBeenCalledWith('2-vertical')
   })
 
-  it('selects a layout and exits comparison when clicking a compare card', async () => {
-    const onLayoutSelect = jest.fn()
-    const user = userEvent.setup()
+  it('shows compare number badges on selected layouts', () => {
     render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
         layouts={mockLayouts}
         photos={[]}
         photoPositions={[]}
         selectedLayoutId="2-horizontal"
-        onLayoutSelect={onLayoutSelect}
+        onLayoutSelect={jest.fn()}
+        compareIds={['2-horizontal', '2-vertical']}
       />
     )
 
-    // Enter compare mode — it auto-adds current selection
-    await user.click(screen.getByTitle('Compare layouts'))
-
-    // Add another layout
-    await user.click(screen.getByText('Stacked'))
-
-    // The compare panel should have two cards; click the "Stacked" one in the compare area
-    const comparePanel = screen.getByText(/Comparing 2\/3 layouts/).closest('div')!
-    const stackedInCompare = within(comparePanel.parentElement!).getAllByText('Stacked')
-    // Click the one inside the compare panel (first match is in compare panel)
-    await user.click(stackedInCompare[0])
-
-    expect(onLayoutSelect).toHaveBeenCalledWith('2-vertical')
+    // Should show numbered badges
+    expect(screen.getByText('1')).toBeInTheDocument()
+    expect(screen.getByText('2')).toBeInTheDocument()
   })
 
-  it('removes a layout from comparison via the X button', async () => {
+  it('calls onToggleCarousel when arrangement button is clicked', async () => {
+    const onToggleCarousel = jest.fn()
     const user = userEvent.setup()
     render(
-      <LayoutGallery
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[{ id: 'p1', file: new File([], 'test.jpg'), dataUrl: 'data:image/jpeg;base64,/9j/' }]}
+        photoPositions={[{ photoId: 'p1', gridArea: 'photo1' }]}
+        selectedLayoutId="2-horizontal"
+        onLayoutSelect={jest.fn()}
+        onArrangementApply={jest.fn()}
+        onToggleCarousel={onToggleCarousel}
+      />
+    )
+
+    await user.click(screen.getByTitle('Explore arrangements'))
+    expect(onToggleCarousel).toHaveBeenCalled()
+  })
+
+  it('shows exit comparison button when compare mode is active', () => {
+    render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId="2-horizontal"
+        onLayoutSelect={jest.fn()}
+        compareIds={['2-horizontal']}
+      />
+    )
+
+    expect(screen.getByTitle('Exit comparison')).toBeInTheDocument()
+  })
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(
+      <LayoutGallery {...defaultPanelProps}
         layouts={mockLayouts}
         photos={[]}
         photoPositions={[]}
@@ -309,55 +339,7 @@ describe('LayoutGallery', () => {
         onLayoutSelect={jest.fn()}
       />
     )
-
-    await user.click(screen.getByTitle('Compare layouts'))
-    await user.click(screen.getByText('Stacked'))
-    expect(screen.getByText(/Comparing 2\/3 layouts/)).toBeInTheDocument()
-
-    // Click the remove button on the Stacked card
-    const removeBtn = screen.getByLabelText('Remove Stacked from comparison')
-    await user.click(removeBtn)
-
-    expect(screen.getByText(/Comparing 1\/3 layouts/)).toBeInTheDocument()
-  })
-
-  it('exits comparison mode when compare button is clicked again', async () => {
-    const user = userEvent.setup()
-    render(
-      <LayoutGallery
-        layouts={mockLayouts}
-        photos={[]}
-        photoPositions={[]}
-        selectedLayoutId="2-horizontal"
-        onLayoutSelect={jest.fn()}
-      />
-    )
-
-    await user.click(screen.getByTitle('Compare layouts'))
-    expect(screen.getByText(/Comparing/)).toBeInTheDocument()
-
-    await user.click(screen.getByTitle('Exit comparison'))
-    expect(screen.queryByText(/Comparing/)).not.toBeInTheDocument()
-  })
-
-  it('clears all comparison items when Clear button is clicked', async () => {
-    const user = userEvent.setup()
-    render(
-      <LayoutGallery
-        layouts={mockLayouts}
-        photos={[]}
-        photoPositions={[]}
-        selectedLayoutId="2-horizontal"
-        onLayoutSelect={jest.fn()}
-      />
-    )
-
-    await user.click(screen.getByTitle('Compare layouts'))
-    await user.click(screen.getByText('Stacked'))
-    expect(screen.getByText(/Comparing 2\/3 layouts/)).toBeInTheDocument()
-
-    await user.click(screen.getByText('Clear'))
-    // Compare mode exits when all items cleared
-    expect(screen.queryByText(/Comparing/)).not.toBeInTheDocument()
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
   })
 })

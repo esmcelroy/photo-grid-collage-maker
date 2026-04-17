@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { axe } from 'jest-axe'
 import { CollagePreview } from '@/components/CollagePreview'
 import type { GridLayout, PhotoPosition, UploadedPhoto, CollageSettings } from '@/lib/types'
 
@@ -424,5 +425,11 @@ describe('CollagePreview', () => {
     const { container } = renderPreview({ positions })
     const imgs = container.querySelectorAll('img')
     expect((imgs[0] as HTMLImageElement).style.objectPosition).toBe('30% 70%')
+  })
+
+  it('has no accessibility violations', async () => {
+    const { container } = renderPreview()
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
   })
 })
