@@ -143,16 +143,21 @@ export function CollagePreview({
     if (!state) return
 
     const touch = e.touches[0]
-
-    // Only show ghost after moving 10px (prevents accidental drags)
     const dx = touch.clientX - state.startX
     const dy = touch.clientY - state.startY
-    if (!state.ghostEl?.parentNode && Math.sqrt(dx * dx + dy * dy) > 10) {
+    const distance = Math.sqrt(dx * dx + dy * dy)
+
+    // Prevent scroll once touch moves beyond tap threshold (10px)
+    if (distance > 10) {
+      e.preventDefault()
+    }
+
+    // Only show ghost after moving 10px (prevents accidental drags)
+    if (!state.ghostEl?.parentNode && distance > 10) {
       document.body.appendChild(state.ghostEl!)
     }
 
     if (state.ghostEl?.parentNode) {
-      e.preventDefault() // Prevent scroll while dragging
       const rect = state.ghostEl.getBoundingClientRect()
       state.ghostEl.style.left = `${touch.clientX - rect.width / 2}px`
       state.ghostEl.style.top = `${touch.clientY - rect.height / 2}px`
@@ -265,6 +270,7 @@ export function CollagePreview({
               style={{ 
                 gridArea: area,
                 borderRadius: `${settings.borderRadius}px`,
+                touchAction: photo ? 'none' : undefined,
               }}
               className={cn(
                 "relative bg-muted overflow-hidden transition-all duration-200 group",
