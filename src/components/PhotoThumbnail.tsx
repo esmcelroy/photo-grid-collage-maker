@@ -31,6 +31,7 @@ export function PhotoThumbnail({ photo, onRemove, index }: PhotoThumbnailProps) 
         variant="destructive"
         className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 w-7 h-7"
         onClick={() => onRemove(photo.id)}
+        aria-label={`Remove ${photo.file.name}`}
       >
         <X className="w-4 h-4" weight="bold" />
       </Button>

@@ -96,9 +96,9 @@ export function UploadZone({
           )}
         </div>
         
-        <h3 className="text-lg font-semibold text-foreground mb-2">
+        <h2 className="text-lg font-semibold text-foreground mb-2">
           {isDragging ? 'Drop your photos here' : 'Upload Photos'}
-        </h3>
+        </h2>
         
         <p className="text-sm text-muted-foreground text-center max-w-sm">
           {isMaxed 
