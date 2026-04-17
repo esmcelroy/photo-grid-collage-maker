@@ -219,7 +219,7 @@ function App() {
           </div>
         </header>
 
-        <div className="grid lg:grid-cols-3 gap-6 mb-6">
+        <main className="grid lg:grid-cols-3 gap-6 mb-6">
           <div className="lg:col-span-2 space-y-6">
             {photos.length === 0 ? (
               <UploadZone 
@@ -230,7 +230,7 @@ function App() {
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold">Your Photos</h3>
+                    <h2 className="text-lg font-semibold">Your Photos</h2>
                     <Badge variant="secondary">
                       {photos.length} / {MAX_PHOTOS}
                     </Badge>
@@ -270,7 +270,7 @@ function App() {
             {selectedLayout && (
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Preview</h3>
+                  <h2 className="text-lg font-semibold">Preview</h2>
                   <ExportDialog
                     onExport={handleDownload}
                     disabled={!selectedLayout}
@@ -311,7 +311,7 @@ function App() {
               </>
             )}
           </div>
-        </div>
+        </main>
 
         {photos.length === 0 && (
           <motion.div

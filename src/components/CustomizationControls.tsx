@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { CollageSettings } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -28,20 +29,34 @@ export function CustomizationControls({
   settings,
   onSettingsChange
 }: CustomizationControlsProps) {
+  const gapSliderRef = useRef<HTMLSpanElement>(null)
+  const radiusSliderRef = useRef<HTMLSpanElement>(null)
+
+  // Radix Slider doesn't forward aria-label to Thumb, so inject it post-render
+  useEffect(() => {
+    gapSliderRef.current
+      ?.querySelector('[role="slider"]')
+      ?.setAttribute('aria-label', 'Photo spacing')
+    radiusSliderRef.current
+      ?.querySelector('[role="slider"]')
+      ?.setAttribute('aria-label', 'Corner radius')
+  })
+
   return (
     <Card className="p-6">
-      <h3 className="text-lg font-semibold mb-6">Customize</h3>
+      <h2 className="text-lg font-semibold mb-6">Customize</h2>
       
       <div className="space-y-6">
-        <div>
+        <div ref={gapSliderRef}>
           <div className="flex items-center justify-between mb-3">
-            <Label htmlFor="gap-slider" className="text-sm font-medium">
+            <Label htmlFor="gap-slider" id="gap-slider-label" className="text-sm font-medium">
               Photo Spacing
             </Label>
             <span className="text-sm text-muted-foreground">{settings.gap}px</span>
           </div>
           <Slider
             id="gap-slider"
+            aria-labelledby="gap-slider-label"
             min={0}
             max={40}
             step={2}
@@ -53,15 +68,16 @@ export function CustomizationControls({
           />
         </div>
 
-        <div>
+        <div ref={radiusSliderRef}>
           <div className="flex items-center justify-between mb-3">
-            <Label htmlFor="radius-slider" className="text-sm font-medium">
+            <Label htmlFor="radius-slider" id="radius-slider-label" className="text-sm font-medium">
               Corner Radius
             </Label>
             <span className="text-sm text-muted-foreground">{settings.borderRadius}px</span>
           </div>
           <Slider
             id="radius-slider"
+            aria-labelledby="radius-slider-label"
             min={0}
             max={32}
             step={2}

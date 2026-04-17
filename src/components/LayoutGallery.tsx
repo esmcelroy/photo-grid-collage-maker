@@ -156,7 +156,7 @@ export function LayoutGallery({
           <div className="w-16 h-16 mx-auto bg-secondary/50 rounded-full flex items-center justify-center mb-4">
             <GridFour className="w-8 h-8 text-muted-foreground" weight="duotone" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">No Layouts Available</h3>
+          <h2 className="text-lg font-semibold mb-2">No Layouts Available</h2>
           <p className="text-sm text-muted-foreground">
             Upload at least one photo to see layout options
           </p>
@@ -168,9 +168,9 @@ export function LayoutGallery({
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">
+        <h2 className="text-lg font-semibold">
           Layout Options
-        </h3>
+        </h2>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
             {layouts.length} {layouts.length === 1 ? 'layout' : 'layouts'}
@@ -180,6 +180,7 @@ export function LayoutGallery({
             size="sm"
             onClick={handleShuffle}
             title="Shuffle layout"
+            aria-label="Shuffle layout"
           >
             <Shuffle className="w-4 h-4" weight="bold" />
           </Button>
@@ -188,6 +189,7 @@ export function LayoutGallery({
             size="sm"
             onClick={() => setCompareIds(isComparing ? [] : (selectedLayoutId ? [selectedLayoutId] : []))}
             title={isComparing ? "Exit comparison" : "Compare layouts"}
+            aria-label={isComparing ? "Exit comparison" : "Compare layouts"}
           >
             <Columns className="w-4 h-4" weight="bold" />
           </Button>
