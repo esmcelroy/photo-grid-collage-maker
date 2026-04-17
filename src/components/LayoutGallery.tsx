@@ -4,10 +4,11 @@ import { LayoutOption } from './LayoutOption'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { GridFour, Shuffle, Columns, X } from '@phosphor-icons/react'
+import { GridFour, Shuffle, Columns, MagicWand, X } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getUniqueAreaNames } from '@/lib/layouts'
+import { ArrangementCarousel } from './ArrangementCarousel'
 
 interface LayoutGalleryProps {
   layouts: GridLayout[]
@@ -15,6 +16,7 @@ interface LayoutGalleryProps {
   photoPositions: PhotoPosition[]
   selectedLayoutId: string | null
   onLayoutSelect: (layoutId: string) => void
+  onArrangementApply?: (layoutId: string, positions: PhotoPosition[]) => void
 }
 
 function parseTemplate(template: string): { rows: string[], columns: string[] } {
@@ -122,9 +124,11 @@ export function LayoutGallery({
   photos,
   photoPositions,
   selectedLayoutId,
-  onLayoutSelect
+  onLayoutSelect,
+  onArrangementApply,
 }: LayoutGalleryProps) {
   const [compareIds, setCompareIds] = useState<string[]>([])
+  const [showCarousel, setShowCarousel] = useState(false)
   const isComparing = compareIds.length > 0
 
   const compareLayouts = useMemo(
@@ -191,8 +195,35 @@ export function LayoutGallery({
           >
             <Columns className="w-4 h-4" weight="bold" />
           </Button>
+          {onArrangementApply && photos.length > 0 && (
+            <Button
+              variant={showCarousel ? "default" : "ghost"}
+              size="sm"
+              onClick={() => {
+                setShowCarousel(prev => !prev)
+                if (!showCarousel) setCompareIds([])
+              }}
+              title={showCarousel ? "Close arrangements" : "Explore arrangements"}
+            >
+              <MagicWand className="w-4 h-4" weight="bold" />
+            </Button>
+          )}
         </div>
       </div>
+
+      {showCarousel && onArrangementApply && (
+        <ArrangementCarousel
+          layouts={layouts}
+          photos={photos}
+          currentLayoutId={selectedLayoutId}
+          currentPositions={photoPositions}
+          onApply={(layoutId, positions) => {
+            onArrangementApply(layoutId, positions)
+            setShowCarousel(false)
+          }}
+          onClose={() => setShowCarousel(false)}
+        />
+      )}
 
       {isComparing && (
         <motion.div
