@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom'
+import 'jest-axe/extend-expect'
 
 // Polyfill browser APIs not implemented by jsdom that Radix UI components require
 class ResizeObserverMock {

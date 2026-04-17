@@ -2,6 +2,7 @@ import React from 'react'
 import { jest } from '@jest/globals'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { axe } from 'jest-axe'
 import { LayoutGallery } from '@/components/LayoutGallery'
 
 // Radix ScrollArea doesn't work reliably in jsdom — render children directly
@@ -326,5 +327,19 @@ describe('LayoutGallery', () => {
     )
 
     expect(screen.getByTitle('Exit comparison')).toBeInTheDocument()
+  })
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId="2-horizontal"
+        onLayoutSelect={jest.fn()}
+      />
+    )
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
   })
 })

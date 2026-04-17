@@ -38,4 +38,11 @@ This is a **fully client-side** application. All data persists in the browser vi
 - **Image fixtures**: test images live in `e2e/fixtures/`; `AppPage.uploadViaHiddenInput()` resolves paths relative to that directory
 - **File upload regression**: clicking `label[for="photo-upload"]` does not propagate to the hidden input — use `AppPage.uploadViaHiddenInput()` (direct `setInputFiles`) until fixed
 - Playwright starts the Vite dev server only — no backend needed
+
+## Accessibility Testing
+
+- **jest-axe** is installed and configured in `src/__tests__/setup.ts` (`jest-axe/extend-expect`)
+- **All new components must include a `toHaveNoViolations()` test** — see `docs/testing-guidelines.md` for patterns
+- **Lighthouse Accessibility score must remain at 100** — run `npx lighthouse <url> --only-categories=accessibility` before merge
+- User-uploaded photos use `alt=""` (decorative) — this is intentional per WCAG for visual composition tools
 - State clearing uses `page.evaluate()` to clear `localStorage` and IndexedDB
