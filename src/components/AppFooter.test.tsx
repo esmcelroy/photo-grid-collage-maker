@@ -27,6 +27,7 @@ describe('AppFooter', () => {
     await user.click(screen.getByRole('button', { name: /about/i }))
     expect(screen.getByText('About Collage Maker')).toBeInTheDocument()
     expect(screen.getByText(/privacy-first/i)).toBeInTheDocument()
+    expect(screen.getByText(/never leave your device/i)).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {
