@@ -145,6 +145,13 @@ function App() {
     toast.success(`Layout changed to ${layout.name}`)
   }, [availableLayouts, photos, updateLayout])
 
+  const handleArrangementApply = useCallback(async (layoutId: string, positions: PhotoPosition[]) => {
+    const layout = availableLayouts.find(l => l.id === layoutId)
+    if (!layout) return
+    await updateLayout(layoutId, positions)
+    toast.success(`Applied ${layout.name} arrangement`)
+  }, [availableLayouts, updateLayout])
+
   const handleDownload = async (options: ExportOptions) => {
     if (!previewRef.current || !selectedLayout) {
       toast.error('No collage to download')
@@ -307,6 +314,7 @@ function App() {
                   photoPositions={photoPositions}
                   selectedLayoutId={selectedLayoutId}
                   onLayoutSelect={handleLayoutSelect}
+                  onArrangementApply={handleArrangementApply}
                 />
               </>
             )}
