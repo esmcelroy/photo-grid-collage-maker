@@ -29,8 +29,8 @@ export function CustomizationControls({
   settings,
   onSettingsChange
 }: CustomizationControlsProps) {
-  const gapSliderRef = useRef<HTMLSpanElement>(null)
-  const radiusSliderRef = useRef<HTMLSpanElement>(null)
+  const gapSliderRef = useRef<HTMLDivElement>(null)
+  const radiusSliderRef = useRef<HTMLDivElement>(null)
 
   // Radix Slider doesn't forward aria-label to Thumb, so inject it post-render
   useEffect(() => {

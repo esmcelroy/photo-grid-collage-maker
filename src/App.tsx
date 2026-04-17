@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useCollageApi } from '@/hooks/useCollageApi'
 import { UploadedPhoto, PhotoPosition, GridLayout, CollageSettings, ExportOptions, MAX_PHOTOS } from '@/lib/types'
 import { getLayoutsForPhotoCount, getUniqueAreaNames } from '@/lib/layouts'
@@ -11,6 +11,8 @@ import { CollagePreview } from '@/components/CollagePreview'
 import { CustomizationControls } from '@/components/CustomizationControls'
 import { ExportDialog } from '@/components/ExportDialog'
 import { PhotoEditDialog } from '@/components/PhotoEditDialog'
+import { ArrangementCarousel } from '@/components/ArrangementCarousel'
+import { ComparePanel } from '@/components/ComparePanel'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -48,6 +50,43 @@ function App() {
   const settingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [availableLayouts, setAvailableLayouts] = useState<GridLayout[]>([])
   const [selectedLayout, setSelectedLayout] = useState<GridLayout | null>(null)
+  const [showCarousel, setShowCarousel] = useState(false)
+  const [compareIds, setCompareIds] = useState<string[]>([])
+  const isComparing = compareIds.length > 0
+
+  const compareLayouts = useMemo(
+    () => compareIds.map(id => availableLayouts.find(l => l.id === id)).filter(Boolean) as GridLayout[],
+    [compareIds, availableLayouts]
+  )
+
+  const handleToggleCarousel = useCallback(() => {
+    setShowCarousel(prev => {
+      if (!prev) setCompareIds([])
+      return !prev
+    })
+  }, [])
+
+  const handleToggleCompare = useCallback((layoutId?: string) => {
+    if (isComparing) {
+      if (layoutId) {
+        // Toggle individual layout in compare
+        setCompareIds(prev => {
+          if (prev.includes(layoutId)) return prev.filter(id => id !== layoutId)
+          if (prev.length >= 3) return prev
+          return [...prev, layoutId]
+        })
+      } else {
+        setCompareIds([])
+      }
+    } else {
+      setShowCarousel(false)
+      setCompareIds(layoutId ? [layoutId] : [])
+    }
+  }, [isComparing])
+
+  const handleClearCompare = useCallback(() => {
+    setCompareIds([])
+  }, [])
 
   // Initialize session if none exists
   useEffect(() => {
@@ -149,6 +188,7 @@ function App() {
     const layout = availableLayouts.find(l => l.id === layoutId)
     if (!layout) return
     await updateLayout(layoutId, positions)
+    setShowCarousel(false)
     toast.success(`Applied ${layout.name} arrangement`)
   }, [availableLayouts, updateLayout])
 
@@ -283,6 +323,38 @@ function App() {
                     disabled={!selectedLayout}
                   />
                 </div>
+
+                <AnimatePresence>
+                  {showCarousel && (
+                    <ArrangementCarousel
+                      layouts={availableLayouts}
+                      photos={photos}
+                      currentLayoutId={selectedLayoutId}
+                      currentPositions={photoPositions}
+                      onApply={handleArrangementApply}
+                      onClose={() => setShowCarousel(false)}
+                    />
+                  )}
+                </AnimatePresence>
+
+                <AnimatePresence>
+                  {isComparing && compareLayouts.length > 0 && (
+                    <ComparePanel
+                      layouts={availableLayouts}
+                      compareIds={compareIds}
+                      photos={photos}
+                      photoPositions={photoPositions}
+                      selectedLayoutId={selectedLayoutId}
+                      onLayoutSelect={(id) => {
+                        handleLayoutSelect(id)
+                        handleClearCompare()
+                      }}
+                      onClearCompare={handleClearCompare}
+                      onToggleCompare={(id) => handleToggleCompare(id)}
+                    />
+                  )}
+                </AnimatePresence>
+
                 <CollagePreview
                   layout={selectedLayout}
                   photos={photos}
@@ -315,6 +387,10 @@ function App() {
                   selectedLayoutId={selectedLayoutId}
                   onLayoutSelect={handleLayoutSelect}
                   onArrangementApply={handleArrangementApply}
+                  showCarousel={showCarousel}
+                  onToggleCarousel={handleToggleCarousel}
+                  compareIds={compareIds}
+                  onToggleCompare={handleToggleCompare}
                 />
               </>
             )}
