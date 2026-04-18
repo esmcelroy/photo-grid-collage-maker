@@ -2,19 +2,18 @@ import React from 'react'
 import { jest } from '@jest/globals'
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { CustomizationControls } from '@/components/CustomizationControls'
 
 // Radix Popover uses portals that don't work in jsdom — render children directly.
-// NOTE: Using a factory that avoids JSX (plain React.createElement) to side-step
-// jest.mock hoist-time issues with the automatic JSX runtime in ESM mode.
-jest.mock('@/components/ui/popover', () => ({
-  Popover: (props: Record<string, unknown>) =>
-    React.createElement('div', null, props.children as React.ReactNode),
-  PopoverTrigger: (props: Record<string, unknown>) =>
-    React.createElement(React.Fragment, null, props.children as React.ReactNode),
-  PopoverContent: (props: Record<string, unknown>) =>
-    React.createElement('div', null, props.children as React.ReactNode),
+jest.unstable_mockModule('@/components/ui/popover', () => ({
+  Popover: (props: { children?: React.ReactNode }) =>
+    React.createElement('div', null, props.children),
+  PopoverTrigger: (props: { children?: React.ReactNode }) =>
+    React.createElement(React.Fragment, null, props.children),
+  PopoverContent: (props: { children?: React.ReactNode }) =>
+    React.createElement('div', null, props.children),
 }))
+
+const { CustomizationControls } = await import('@/components/CustomizationControls')
 
 // Intentionally NOT mocking the Slider: mocking with JSX or React.createElement
 // inside jest.mock() factory functions is unreliable in ESM mode because the JSX
@@ -57,7 +56,7 @@ describe('CustomizationControls', () => {
 
   it('shows "Custom Color" button', () => {
     render(<CustomizationControls settings={defaultSettings} onSettingsChange={jest.fn()} />)
-    expect(screen.getByText(/custom color/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /custom color/i })).toBeInTheDocument()
   })
 
   // ─── slider onValueChange handlers ────────────────────────────────────────
@@ -97,16 +96,11 @@ describe('CustomizationControls', () => {
   // ─── custom colour picker ─────────────────────────────────────────────────
 
   it('calls onSettingsChange with updated backgroundColor when the custom colour input changes', async () => {
-    const user = userEvent.setup()
     const onSettingsChange = jest.fn()
     render(<CustomizationControls settings={defaultSettings} onSettingsChange={onSettingsChange} />)
 
-    // The Popover mock isn't reliable in ESM jest — interact with the real Radix
-    // Popover by clicking its trigger to open it first.
-    await user.click(screen.getByText(/custom color/i))
-
-    // Content is rendered in a portal to document.body; findBy* waits for it
-    const colorInput = await screen.findByLabelText(/pick a custom color/i)
+    // The Popover mock renders content inline, so the color input is already in the DOM
+    const colorInput = screen.getByLabelText(/pick a custom color/i)
     fireEvent.change(colorInput, { target: { value: '#ff0000' } })
 
     expect(onSettingsChange).toHaveBeenCalledWith(
