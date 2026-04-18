@@ -150,4 +150,47 @@ describe('PhotoEditDialog', () => {
     fireEvent.click(applyBtn)
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
+
+  it('wraps rotation counter-clockwise from 0 to 270', async () => {
+    renderDialog({ position: makePosition({ rotation: 0 }) })
+    const ccwButton = await screen.findByLabelText('Rotate counter-clockwise')
+    fireEvent.click(ccwButton)
+    expect(screen.getByText('270°')).toBeInTheDocument()
+  })
+
+  it('applies non-default rotation, scale, and objectPosition values', async () => {
+    const onApply = jest.fn()
+    renderDialog({
+      onApply,
+      position: makePosition({ rotation: 90, scale: 1.5, objectPosition: '30% 70%' }),
+    })
+
+    const applyBtn = await screen.findByRole('button', { name: /apply/i })
+    fireEvent.click(applyBtn)
+
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rotation: 90,
+        scale: 1.5,
+        objectPosition: '30% 70%',
+      })
+    )
+  })
+
+  it('uses defaults when position has no rotation/scale/objectPosition', async () => {
+    renderDialog({ position: makePosition() })
+    expect(await screen.findByText('0°')).toBeInTheDocument()
+    expect(screen.getByText('100%')).toBeInTheDocument()
+  })
+
+  it('renders position sliders with horizontal and vertical labels', async () => {
+    renderDialog()
+    expect(await screen.findByLabelText('Horizontal position')).toBeInTheDocument()
+    expect(screen.getByLabelText('Vertical position')).toBeInTheDocument()
+  })
+
+  it('renders zoom slider', async () => {
+    renderDialog()
+    expect(await screen.findByLabelText('Zoom level')).toBeInTheDocument()
+  })
 })

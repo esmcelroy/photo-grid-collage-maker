@@ -147,6 +147,81 @@ describe('useCollageApi', () => {
     })
   })
 
+  describe('removePhoto', () => {
+    it('calls removePhoto with the correct collageId and photoId', async () => {
+      localStorage.setItem(SESSION_KEY, 'test-session-id')
+
+      ;(collageDb.getCollageState as jest.MockedFunction<typeof collageDb.getCollageState>)
+        .mockResolvedValue(mockCollageState)
+      ;(collageDb.removePhoto as jest.MockedFunction<typeof collageDb.removePhoto>)
+        .mockResolvedValueOnce(undefined)
+
+      const { wrapper } = createWrapper()
+      const { result } = renderHook(() => useCollageApi(), { wrapper })
+
+      await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+      await act(async () => {
+        await result.current.removePhoto('photo-1')
+      })
+
+      expect(collageDb.removePhoto).toHaveBeenCalledWith('test-session-id', 'photo-1')
+    })
+  })
+
+  describe('updateLayout', () => {
+    it('calls updateCollage with selectedLayoutId and photoPositions', async () => {
+      localStorage.setItem(SESSION_KEY, 'test-session-id')
+
+      const positions = [{ photoId: 'photo-1', gridArea: 'a' }]
+
+      ;(collageDb.getCollageState as jest.MockedFunction<typeof collageDb.getCollageState>)
+        .mockResolvedValue(mockCollageState)
+      ;(collageDb.updateCollage as jest.MockedFunction<typeof collageDb.updateCollage>)
+        .mockResolvedValueOnce({ ...mockCollageState, selectedLayoutId: 'layout-2', photoPositions: positions })
+
+      const { wrapper } = createWrapper()
+      const { result } = renderHook(() => useCollageApi(), { wrapper })
+
+      await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+      await act(async () => {
+        await result.current.updateLayout('layout-2', positions)
+      })
+
+      expect(collageDb.updateCollage).toHaveBeenCalledWith('test-session-id', {
+        selectedLayoutId: 'layout-2',
+        photoPositions: positions,
+      })
+    })
+  })
+
+  describe('updatePositions', () => {
+    it('calls updateCollage with photoPositions only', async () => {
+      localStorage.setItem(SESSION_KEY, 'test-session-id')
+
+      const positions = [{ photoId: 'photo-1', gridArea: 'b' }]
+
+      ;(collageDb.getCollageState as jest.MockedFunction<typeof collageDb.getCollageState>)
+        .mockResolvedValue(mockCollageState)
+      ;(collageDb.updateCollage as jest.MockedFunction<typeof collageDb.updateCollage>)
+        .mockResolvedValueOnce({ ...mockCollageState, photoPositions: positions })
+
+      const { wrapper } = createWrapper()
+      const { result } = renderHook(() => useCollageApi(), { wrapper })
+
+      await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+      await act(async () => {
+        await result.current.updatePositions(positions)
+      })
+
+      expect(collageDb.updateCollage).toHaveBeenCalledWith('test-session-id', {
+        photoPositions: positions,
+      })
+    })
+  })
+
   describe('updateSettings', () => {
     it('calls updateCollage with settings', async () => {
       localStorage.setItem(SESSION_KEY, 'test-session-id')
@@ -173,6 +248,29 @@ describe('useCollageApi', () => {
     })
   })
 
+  describe('clearAll', () => {
+    it('creates a new collage and updates the session id', async () => {
+      localStorage.setItem(SESSION_KEY, 'test-session-id')
+
+      ;(collageDb.getCollageState as jest.MockedFunction<typeof collageDb.getCollageState>)
+        .mockResolvedValue(mockCollageState)
+      ;(collageDb.createCollage as jest.MockedFunction<typeof collageDb.createCollage>)
+        .mockResolvedValueOnce({ id: 'new-cleared-id' })
+
+      const { wrapper } = createWrapper()
+      const { result } = renderHook(() => useCollageApi(), { wrapper })
+
+      await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+      await act(async () => {
+        await result.current.clearAll()
+      })
+
+      expect(collageDb.createCollage).toHaveBeenCalled()
+      expect(localStorage.getItem(SESSION_KEY)).toBe('new-cleared-id')
+    })
+  })
+
   describe('error handling', () => {
     it('exposes an error when getCollageState throws', async () => {
       localStorage.setItem(SESSION_KEY, 'test-session-id')
@@ -186,6 +284,25 @@ describe('useCollageApi', () => {
       await waitFor(() => expect(result.current.error).not.toBeNull())
 
       expect(result.current.error).toBeInstanceOf(Error)
+    })
+  })
+
+  describe('existing session', () => {
+    it('loads collage state from localStorage session id on mount', async () => {
+      localStorage.setItem(SESSION_KEY, 'test-session-id')
+
+      ;(collageDb.getCollageState as jest.MockedFunction<typeof collageDb.getCollageState>)
+        .mockResolvedValue(mockCollageState)
+
+      const { wrapper } = createWrapper()
+      const { result } = renderHook(() => useCollageApi(), { wrapper })
+
+      await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+      expect(result.current.collageId).toBe('test-session-id')
+      expect(result.current.photos).toHaveLength(1)
+      expect(result.current.selectedLayoutId).toBe('layout-1')
+      expect(collageDb.getCollageState).toHaveBeenCalledWith('test-session-id')
     })
   })
 })
