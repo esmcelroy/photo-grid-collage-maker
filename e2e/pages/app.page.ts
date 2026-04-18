@@ -33,8 +33,6 @@ export class AppPage {
    * in tests that need to reset mid-test (e.g., testing "clear all").
    */
   async clearState() {
-    // In most cases, the fresh context handles cleanup.
-    // For mid-test resets, clear storage and reload.
     await this.page.evaluate(async () => {
       localStorage.clear()
       const dbs = await indexedDB.databases()
@@ -57,34 +55,32 @@ export class AppPage {
   }
 
   /**
-   * Upload one or more files through the visible upload control.
-   * Attempts to use the browser's native file chooser (click label → chooser appears).
+   * Upload one or more files through the browser's native file chooser.
+   * Clicks the upload zone, waits for the file chooser event, and sets files.
    *
-   * REGRESSION NOTE (April 2026):
-   * The file chooser event is NOT firing when clicking the upload label.
-   * This is a regression: the label[for="photo-upload"] should trigger the
-   * hidden input[type="file"], but the click event is not propagating correctly.
-   * The hidden input is present and accessible, but clicking the label does not
-   * open the native file picker in the browser.
-   *
-   * For now, this method falls back to direct hidden-input access to keep tests
-   * running, but the underlying wiring bug needs investigation and fixing.
+   * This validates the real user click path: click upload zone → native
+   * file picker opens → files selected → upload processes.
    *
    * @param filePaths - Array of file paths relative to e2e/fixtures/
    */
   async uploadViaFileChooser(filePaths: string[]) {
-    // REGRESSION: Attempt file chooser path first (demonstrates the bug if it fails)
-    const uploadLabel = this.page.locator('label[for="photo-upload"]')
-    
-    // For now, fall back to the hidden-input approach that works
-    // TODO: Fix the label-to-input click wiring so file chooser actually fires
-    await this.uploadViaHiddenInput(filePaths)
+    const absolutePaths = filePaths.map(filePath =>
+      path.join(__dirname, '../fixtures', filePath)
+    )
+
+    // Wait for file chooser and click the upload input simultaneously
+    const [fileChooser] = await Promise.all([
+      this.page.waitForEvent('filechooser'),
+      this.page.locator('input[type="file"]').click(),
+    ])
+
+    await fileChooser.setFiles(absolutePaths)
+    await this.waitForUploadComplete()
   }
 
   /**
    * Upload files using the hidden input directly.
-   * This bypasses the file-chooser flow and is useful for non-proof tests
-   * or regression confirmation tests.
+   * This bypasses the file-chooser flow and is useful for batch/performance tests.
    *
    * @param filePaths - Array of file paths relative to e2e/fixtures/
    */
@@ -121,16 +117,18 @@ export class AppPage {
 
   /**
    * Capture a proof screenshot at a critical UI checkpoint.
-   * Screenshots are saved to a predictable location with descriptive names.
+   * Screenshots are saved to test-results/screenshots/ with descriptive names.
    *
-   * @param name - Descriptive name for the checkpoint (e.g., "upload-complete", "preview-rendered")
+   * @param name - Descriptive name for the checkpoint
+   * @returns The path where the screenshot was saved
    */
-  async takeProofScreenshot(name: string) {
-    const screenshotPath = `./test-results/proof-${name}-${Date.now()}.png`
+  async takeProofScreenshot(name: string): Promise<string> {
+    const screenshotPath = `./test-results/screenshots/proof-${name}.png`
     await this.page.screenshot({
       path: screenshotPath,
-      fullPage: false, // Capture viewport only for faster, smaller artifacts
+      fullPage: false,
     })
+    return screenshotPath
   }
 
   /**
@@ -150,8 +148,6 @@ export class AppPage {
 
   /**
    * Assert that the photo count badge shows the expected count.
-   *
-   * @param count - Expected number of uploaded photos
    */
   async assertPhotoCountBadge(count: number) {
     const badge = `${count} / 16`
@@ -160,12 +156,9 @@ export class AppPage {
 
   /**
    * Assert that upload above the 16-photo limit is rejected.
-   * At capacity (16/16), the upload zone is hidden and replaced by the photo grid.
    */
   async assertUploadLimitEnforced() {
-    // At 16 photos, the upload zone should not be visible
     await expect(this.page.getByText('Upload Photos')).not.toBeVisible()
-    // The photo count badge should show 16/16
     await this.assertPhotoCountBadge(16)
   }
 
@@ -178,9 +171,6 @@ export class AppPage {
 
   /**
    * Get the current photo count from the badge.
-   * Useful for assertions and test logic.
-   *
-   * @returns The number of uploaded photos, or null if badge not found
    */
   async getCurrentPhotoCount(): Promise<number | null> {
     const badgeText = await this.page
@@ -194,11 +184,11 @@ export class AppPage {
   }
 
   /**
-   * Verify that a successful upload was captured by the proof test infrastructure.
-   * This is a placeholder for checking screenshot artifacts were produced.
+   * Assert that a proof screenshot was captured at the given path.
    */
-  async verifyProofArtifactsCaptured(): Promise<boolean> {
-    // TODO: Implement proof artifact verification once screenshots are being captured
-    return true
+  async assertProofScreenshotExists(name: string): Promise<boolean> {
+    const fs = await import('fs')
+    const screenshotPath = `./test-results/screenshots/proof-${name}.png`
+    return fs.existsSync(screenshotPath)
   }
 }
