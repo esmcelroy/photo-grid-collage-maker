@@ -377,7 +377,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 lg:pb-0">
+    <div className="min-h-screen bg-background pb-20 lg:pb-0 overflow-x-hidden">
       <Toaster position="top-right" />
       <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-8 max-w-7xl">
         <header className="mb-4 sm:mb-8">
@@ -439,7 +439,7 @@ function App() {
         </header>
 
         <main className="grid lg:grid-cols-3 gap-6 mb-6">
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6 min-w-0">
             {photos.length === 0 ? (
               <UploadZone 
                 onFilesSelected={handleFilesSelected}
@@ -548,7 +548,7 @@ function App() {
             )}
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-6 min-w-0">
             {photos.length > 0 && (
               <>
                 <CollapsibleSection title="Presets" defaultOpen={false}>
