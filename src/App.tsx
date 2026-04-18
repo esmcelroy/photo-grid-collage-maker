@@ -18,8 +18,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Toaster } from '@/components/ui/sonner'
-import { Trash, Sparkle } from '@phosphor-icons/react'
+import { Trash, Sparkle, ArrowCounterClockwise, ArrowClockwise } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { useCollageHistory, CollageSnapshot } from '@/hooks/use-collage-history'
 import { motion, AnimatePresence } from 'framer-motion'
 
 function initializePositions(layout: GridLayout, photosArray: UploadedPhoto[]): PhotoPosition[] {
@@ -45,6 +46,14 @@ function App() {
     updateSettings,
     clearAll,
   } = useCollageApi()
+
+  const { canUndo, canRedo, pushSnapshot, undo, redo, setRestoring, clear: clearHistory } = useCollageHistory()
+
+  const getCurrentSnapshot = useCallback((): CollageSnapshot => ({
+    selectedLayoutId,
+    photoPositions,
+    settings,
+  }), [selectedLayoutId, photoPositions, settings])
 
   const previewRef = useRef<HTMLDivElement>(null)
   const [editingArea, setEditingArea] = useState<string | null>(null)
@@ -169,29 +178,32 @@ function App() {
   }, [removePhoto])
 
   const handleSettingsChange = useCallback((newSettings: CollageSettings) => {
+    pushSnapshot(getCurrentSnapshot())
     if (settingsTimerRef.current) clearTimeout(settingsTimerRef.current)
     settingsTimerRef.current = setTimeout(() => {
       void updateSettings(newSettings).catch(() => {
         toast.error('Failed to save settings')
       })
     }, 300)
-  }, [updateSettings])
+  }, [updateSettings, pushSnapshot, getCurrentSnapshot])
 
   const handleLayoutSelect = useCallback(async (layoutId: string) => {
     const layout = availableLayouts.find(l => l.id === layoutId)
     if (!layout) return
+    pushSnapshot(getCurrentSnapshot())
     const newPositions = initializePositions(layout, photos)
     await updateLayout(layoutId, newPositions)
     toast.success(`Layout changed to ${layout.name}`)
-  }, [availableLayouts, photos, updateLayout])
+  }, [availableLayouts, photos, updateLayout, pushSnapshot, getCurrentSnapshot])
 
   const handleArrangementApply = useCallback(async (layoutId: string, positions: PhotoPosition[]) => {
     const layout = availableLayouts.find(l => l.id === layoutId)
     if (!layout) return
+    pushSnapshot(getCurrentSnapshot())
     await updateLayout(layoutId, positions)
     setShowCarousel(false)
     toast.success(`Applied ${layout.name} arrangement`)
-  }, [availableLayouts, updateLayout])
+  }, [availableLayouts, updateLayout, pushSnapshot, getCurrentSnapshot])
 
   const handleDownload = async (options: ExportOptions) => {
     if (!previewRef.current || !selectedLayout) {
@@ -216,6 +228,7 @@ function App() {
 
   const handleClearAll = async () => {
     await clearAll()
+    clearHistory()
     toast.success('All photos cleared')
   }
 
@@ -224,6 +237,7 @@ function App() {
   }
 
   const handleApplyEdit = async (updatedPosition: PhotoPosition) => {
+    pushSnapshot(getCurrentSnapshot())
     const newPositions = photoPositions.map(p =>
       p.gridArea === updatedPosition.gridArea ? updatedPosition : p
     )
@@ -233,6 +247,50 @@ function App() {
       toast.error('Failed to save photo edits')
     }
   }
+
+  const handleUndo = useCallback(async () => {
+    const snapshot = undo(getCurrentSnapshot())
+    if (!snapshot) return
+    setRestoring(true)
+    try {
+      if (snapshot.selectedLayoutId) {
+        await updateLayout(snapshot.selectedLayoutId, snapshot.photoPositions)
+      }
+      await updateSettings(snapshot.settings)
+    } finally {
+      setRestoring(false)
+    }
+  }, [undo, getCurrentSnapshot, setRestoring, updateLayout, updateSettings])
+
+  const handleRedo = useCallback(async () => {
+    const snapshot = redo(getCurrentSnapshot())
+    if (!snapshot) return
+    setRestoring(true)
+    try {
+      if (snapshot.selectedLayoutId) {
+        await updateLayout(snapshot.selectedLayoutId, snapshot.photoPositions)
+      }
+      await updateSettings(snapshot.settings)
+    } finally {
+      setRestoring(false)
+    }
+  }, [redo, getCurrentSnapshot, setRestoring, updateLayout, updateSettings])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey
+      if (!isMod) return
+      if (e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        handleUndo()
+      } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+        e.preventDefault()
+        handleRedo()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [handleUndo, handleRedo])
 
   // Derived state for edit dialog
   const editingPosition = editingArea
@@ -252,18 +310,44 @@ function App() {
       <Toaster position="top-right" />
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <header className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center">
-              <Sparkle className="w-6 h-6 text-white" weight="fill" />
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center">
+                <Sparkle className="w-6 h-6 text-white" weight="fill" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                  Collage Maker
+                </h1>
+                <p className="text-muted-foreground">
+                  Create beautiful photo grids in seconds
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                Collage Maker
-              </h1>
-              <p className="text-muted-foreground">
-                Create beautiful photo grids in seconds
-              </p>
-            </div>
+            {photos.length > 0 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleUndo}
+                  disabled={!canUndo}
+                  title="Undo (Cmd+Z)"
+                  aria-label="Undo"
+                >
+                  <ArrowCounterClockwise className="w-4 h-4" weight="bold" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRedo}
+                  disabled={!canRedo}
+                  title="Redo (Cmd+Shift+Z)"
+                  aria-label="Redo"
+                >
+                  <ArrowClockwise className="w-4 h-4" weight="bold" />
+                </Button>
+              </div>
+            )}
           </div>
         </header>
 
@@ -362,6 +446,7 @@ function App() {
                   photoPositions={photoPositions}
                   settings={settings}
                   onPositionsChange={(nextPositions) => {
+                    pushSnapshot(getCurrentSnapshot())
                     void updatePositions(nextPositions).catch(() => {
                       toast.error('Failed to update photo positions')
                     })
