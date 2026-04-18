@@ -19,10 +19,13 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Toaster } from '@/components/ui/sonner'
-import { Trash, Sparkle, ArrowCounterClockwise, ArrowClockwise, UploadSimple, Sliders, GridFour, DownloadSimple, Sun, Moon, Monitor } from '@phosphor-icons/react'
+import { Trash, Sparkle, ArrowCounterClockwise, ArrowClockwise, UploadSimple, Sliders, GridFour, DownloadSimple, Sun, Moon, Monitor, MagicWand } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useCollageHistory, CollageSnapshot } from '@/hooks/use-collage-history'
 import { useDarkMode } from '@/hooks/use-dark-mode'
+import { useSmartPositioning } from '@/hooks/use-smart-position'
+import { analyzePhotoWithCache, calculateSmartPosition } from '@/lib/face-detection'
+import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 
 function initializePositions(layout: GridLayout, photosArray: UploadedPhoto[]): PhotoPosition[] {
@@ -75,6 +78,7 @@ function App() {
 
   const { canUndo, canRedo, pushSnapshot, undo, redo, setRestoring, clear: clearHistory } = useCollageHistory()
   const { theme, setTheme, isDark } = useDarkMode()
+  const { enabled: smartPositionEnabled, setEnabled: setSmartPositionEnabled } = useSmartPositioning()
 
   const cycleTheme = useCallback(() => {
     const next = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'
@@ -327,6 +331,38 @@ function App() {
     return () => window.removeEventListener('keydown', handler)
   }, [handleUndo, handleRedo])
 
+  // Auto-apply smart positions when enabled and layout changes
+  useEffect(() => {
+    if (!smartPositionEnabled || !selectedLayout || photos.length === 0) return
+
+    let cancelled = false
+    async function applySmartPositions() {
+      const analyses = await Promise.all(
+        photos.map(p => analyzePhotoWithCache(p.id, p.dataUrl))
+      )
+      if (cancelled) return
+
+      const updatedPositions = photoPositions.map(pos => {
+        const analysis = analyses.find(a => a.photoId === pos.photoId)
+        if (!analysis || analysis.regions.length === 0) return pos
+
+        const smartPos = calculateSmartPosition(analysis)
+        if (smartPos === '50% 50%') return pos
+
+        return { ...pos, objectPosition: smartPos }
+      })
+
+      const changed = updatedPositions.some((p, i) => p.objectPosition !== photoPositions[i].objectPosition)
+      if (changed && !cancelled) {
+        void updatePositions(updatedPositions).catch(() => {})
+      }
+    }
+
+    applySmartPositions()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [smartPositionEnabled, selectedLayoutId, photos.length])
+
   // Derived state for edit dialog
   const editingPosition = editingArea
     ? photoPositions.find(p => p.gridArea === editingArea)
@@ -513,6 +549,29 @@ function App() {
           <div className="space-y-6">
             {photos.length > 0 && (
               <>
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <MagicWand className="w-4 h-4 text-primary" weight="duotone" />
+                    <span className="text-sm font-medium">Smart Position</span>
+                  </div>
+                  <button
+                    role="switch"
+                    aria-checked={smartPositionEnabled}
+                    onClick={() => setSmartPositionEnabled(!smartPositionEnabled)}
+                    className={cn(
+                      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                      smartPositionEnabled ? "bg-primary" : "bg-muted-foreground/30"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                        smartPositionEnabled ? "translate-x-6" : "translate-x-1"
+                      )}
+                    />
+                  </button>
+                </div>
+
                 <CollapsibleSection title="Presets" defaultOpen={false}>
                   <PresetGallery
                     onApplyPreset={handleSettingsChange}
