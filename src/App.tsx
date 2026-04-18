@@ -19,9 +19,10 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Toaster } from '@/components/ui/sonner'
-import { Trash, Sparkle, ArrowCounterClockwise, ArrowClockwise, UploadSimple, Sliders, GridFour, DownloadSimple } from '@phosphor-icons/react'
+import { Trash, Sparkle, ArrowCounterClockwise, ArrowClockwise, UploadSimple, Sliders, GridFour, DownloadSimple, Sun, Moon, Monitor } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useCollageHistory, CollageSnapshot } from '@/hooks/use-collage-history'
+import { useDarkMode } from '@/hooks/use-dark-mode'
 import { motion, AnimatePresence } from 'framer-motion'
 
 function initializePositions(layout: GridLayout, photosArray: UploadedPhoto[]): PhotoPosition[] {
@@ -73,6 +74,15 @@ function App() {
   } = useCollageApi()
 
   const { canUndo, canRedo, pushSnapshot, undo, redo, setRestoring, clear: clearHistory } = useCollageHistory()
+  const { theme, setTheme, isDark } = useDarkMode()
+
+  const cycleTheme = useCallback(() => {
+    const next = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'
+    setTheme(next)
+  }, [theme, setTheme])
+
+  const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor
+  const themeLabel = theme === 'light' ? 'Light mode' : theme === 'dark' ? 'Dark mode' : 'System theme'
 
   const getCurrentSnapshot = useCallback((): CollageSnapshot => ({
     selectedLayoutId,
@@ -331,50 +341,64 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 lg:pb-0">
       <Toaster position="top-right" />
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <header className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center">
-                <Sparkle className="w-6 h-6 text-white" weight="fill" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center">
+                <Sparkle className="w-5 h-5 sm:w-6 sm:h-6 text-white" weight="fill" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
                   Collage Maker
                 </h1>
-                <p className="text-muted-foreground">
+                <p className="text-muted-foreground hidden sm:block">
                   Create beautiful photo grids in seconds
                 </p>
               </div>
             </div>
-            {photos.length > 0 && (
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleUndo}
-                  disabled={!canUndo}
-                  title="Undo (⌘Z)"
-                  aria-label="Undo"
-                  aria-keyshortcuts="Meta+Z"
-                >
-                  <ArrowCounterClockwise className="w-4 h-4" weight="bold" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRedo}
-                  disabled={!canRedo}
-                  title="Redo (⌘⇧Z)"
-                  aria-label="Redo"
-                  aria-keyshortcuts="Meta+Shift+Z"
-                >
-                  <ArrowClockwise className="w-4 h-4" weight="bold" />
-                </Button>
-              </div>
-            )}
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={cycleTheme}
+                aria-label={themeLabel}
+                title={themeLabel}
+                className="min-h-[44px] min-w-[44px]"
+              >
+                <ThemeIcon className="w-4 h-4" weight="bold" />
+              </Button>
+              {photos.length > 0 && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleUndo}
+                    disabled={!canUndo}
+                    title="Undo (⌘Z)"
+                    aria-label="Undo"
+                    aria-keyshortcuts="Meta+Z"
+                    className="min-h-[44px] min-w-[44px]"
+                  >
+                    <ArrowCounterClockwise className="w-4 h-4" weight="bold" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRedo}
+                    disabled={!canRedo}
+                    title="Redo (⌘⇧Z)"
+                    aria-label="Redo"
+                    aria-keyshortcuts="Meta+Shift+Z"
+                    className="min-h-[44px] min-w-[44px]"
+                  >
+                    <ArrowClockwise className="w-4 h-4" weight="bold" />
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
@@ -398,6 +422,7 @@ function App() {
                     variant="ghost"
                     size="sm"
                     onClick={handleClearAll}
+                    className="min-h-[44px]"
                   >
                     <Trash className="w-4 h-4 mr-2" weight="duotone" />
                     Clear All
@@ -533,29 +558,29 @@ function App() {
             </h2>
             <div className="flex items-center justify-center gap-4 sm:gap-6 py-4 flex-wrap">
               <div className="flex flex-col items-center gap-2">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <UploadSimple className="w-7 h-7 text-primary" weight="duotone" />
+                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <UploadSimple className="w-5 h-5 sm:w-7 sm:h-7 text-primary" weight="duotone" />
                 </div>
                 <span className="text-sm font-medium text-foreground">Upload</span>
               </div>
               <svg className="w-6 h-6 text-muted-foreground/50 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
               <div className="flex flex-col items-center gap-2">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <Sliders className="w-7 h-7 text-primary" weight="duotone" />
+                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <Sliders className="w-5 h-5 sm:w-7 sm:h-7 text-primary" weight="duotone" />
                 </div>
                 <span className="text-sm font-medium text-foreground">Customize</span>
               </div>
               <svg className="w-6 h-6 text-muted-foreground/50 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
               <div className="flex flex-col items-center gap-2">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <GridFour className="w-7 h-7 text-primary" weight="duotone" />
+                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <GridFour className="w-5 h-5 sm:w-7 sm:h-7 text-primary" weight="duotone" />
                 </div>
                 <span className="text-sm font-medium text-foreground">Choose Layout</span>
               </div>
               <svg className="w-6 h-6 text-muted-foreground/50 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
               <div className="flex flex-col items-center gap-2">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <DownloadSimple className="w-7 h-7 text-primary" weight="duotone" />
+                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <DownloadSimple className="w-5 h-5 sm:w-7 sm:h-7 text-primary" weight="duotone" />
                 </div>
                 <span className="text-sm font-medium text-foreground">Download</span>
               </div>
@@ -575,6 +600,21 @@ function App() {
           position={editingPosition}
           onApply={handleApplyEdit}
         />
+      )}
+
+      {photos.length > 0 && selectedLayout && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border p-3 lg:hidden">
+          <ExportDialog
+            onExport={handleDownload}
+            disabled={!selectedLayout}
+            trigger={
+              <Button className="w-full min-h-[44px]" size="lg">
+                <DownloadSimple className="w-5 h-5 mr-2" weight="bold" />
+                Export Collage
+              </Button>
+            }
+          />
+        </div>
       )}
 
       <AppFooter />

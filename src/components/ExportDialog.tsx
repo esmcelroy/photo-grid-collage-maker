@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type ReactNode } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -19,9 +19,10 @@ import type { ExportFormat, ExportOptions } from '@/lib/types'
 interface ExportDialogProps {
   onExport: (options: ExportOptions) => void
   disabled?: boolean
+  trigger?: ReactNode
 }
 
-export function ExportDialog({ onExport, disabled }: ExportDialogProps) {
+export function ExportDialog({ onExport, disabled, trigger }: ExportDialogProps) {
   const [open, setOpen] = useState(false)
   const [format, setFormat] = useState<ExportFormat>('png')
   const [quality, setQuality] = useState(90)
@@ -62,10 +63,12 @@ export function ExportDialog({ onExport, disabled }: ExportDialogProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button size="lg" disabled={disabled}>
-          <DownloadSimple className="w-5 h-5 mr-2" weight="duotone" />
-          Download
-        </Button>
+        {trigger || (
+          <Button size="lg" disabled={disabled}>
+            <DownloadSimple className="w-5 h-5 mr-2" weight="duotone" />
+            Download
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
