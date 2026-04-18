@@ -7,7 +7,6 @@ import {
   saveCustomPresets,
   getAllPresets,
 } from '@/lib/presets'
-import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { FloppyDisk, X } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
@@ -64,9 +63,8 @@ export function PresetGallery({ onApplyPreset, currentSettings }: PresetGalleryP
   )
 
   return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold">Presets</h3>
+    <div>
+      <div className="flex justify-end mb-3">
         <Button variant="ghost" size="sm" onClick={() => setShowSaveDialog(true)}>
           <FloppyDisk className="w-4 h-4 mr-1" />
           Save Current
@@ -137,6 +135,6 @@ export function PresetGallery({ onApplyPreset, currentSettings }: PresetGalleryP
           )
         })}
       </div>
-    </Card>
+    </div>
   )
 }

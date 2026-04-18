@@ -23,9 +23,9 @@ const { CustomizationControls } = await import('@/components/CustomizationContro
 const defaultSettings = { gap: 8, backgroundColor: 'transparent', borderRadius: 0 }
 
 describe('CustomizationControls', () => {
-  it('renders the Customize heading', () => {
+  it('renders the Photo Spacing label', () => {
     render(<CustomizationControls settings={defaultSettings} onSettingsChange={jest.fn()} />)
-    expect(screen.getByText('Customize')).toBeInTheDocument()
+    expect(screen.getByText('Photo Spacing')).toBeInTheDocument()
   })
 
   it('displays the current gap value', () => {

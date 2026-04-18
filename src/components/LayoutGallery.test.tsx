@@ -58,7 +58,7 @@ describe('LayoutGallery', () => {
     expect(screen.getByText(/no layouts available/i)).toBeInTheDocument()
   })
 
-  it('shows "Layout Options" heading when layouts are present', () => {
+  it('shows layout count text when layouts are present', () => {
     render(
       <LayoutGallery {...defaultPanelProps}
         layouts={mockLayouts}
@@ -68,7 +68,7 @@ describe('LayoutGallery', () => {
         onLayoutSelect={jest.fn()}
       />
     )
-    expect(screen.getByText('Layout Options')).toBeInTheDocument()
+    expect(screen.getByText('3 layouts')).toBeInTheDocument()
   })
 
   it('shows the layout count', () => {

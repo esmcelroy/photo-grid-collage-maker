@@ -5,7 +5,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { GridFour, Shuffle, Columns, MagicWand } from '@phosphor-icons/react'
-import { cn } from '@/lib/utils'
 import { getUniqueAreaNames } from '@/lib/layouts'
 
 const PLATFORM_FILTERS: { value: SocialPlatform | null; label: string }[] = [
@@ -79,44 +78,39 @@ export function LayoutGallery({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">
-          Layout Options
-        </h2>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
-            {filteredLayouts.length} {filteredLayouts.length === 1 ? 'layout' : 'layouts'}
-          </span>
+      <div className="flex items-center justify-end gap-2 mb-3">
+        <span className="text-sm text-muted-foreground mr-auto">
+          {filteredLayouts.length} {filteredLayouts.length === 1 ? 'layout' : 'layouts'}
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleShuffle}
+          title="Shuffle layout"
+          aria-label="Shuffle layout"
+        >
+          <Shuffle className="w-4 h-4" weight="bold" />
+        </Button>
+        <Button
+          variant={isComparing ? "default" : "ghost"}
+          size="sm"
+          onClick={() => onToggleCompare(selectedLayoutId ?? undefined)}
+          title={isComparing ? "Exit comparison" : "Compare layouts"}
+          aria-label={isComparing ? "Exit comparison" : "Compare layouts"}
+        >
+          <Columns className="w-4 h-4" weight="bold" />
+        </Button>
+        {onArrangementApply && photos.length > 0 && (
           <Button
-            variant="ghost"
+            variant={showCarousel ? "default" : "ghost"}
             size="sm"
-            onClick={handleShuffle}
-            title="Shuffle layout"
-            aria-label="Shuffle layout"
+            onClick={onToggleCarousel}
+            title={showCarousel ? "Close arrangements" : "Explore arrangements"}
+            aria-label={showCarousel ? "Close arrangements" : "Explore arrangements"}
           >
-            <Shuffle className="w-4 h-4" weight="bold" />
+            <MagicWand className="w-4 h-4" weight="bold" />
           </Button>
-          <Button
-            variant={isComparing ? "default" : "ghost"}
-            size="sm"
-            onClick={() => onToggleCompare(selectedLayoutId ?? undefined)}
-            title={isComparing ? "Exit comparison" : "Compare layouts"}
-            aria-label={isComparing ? "Exit comparison" : "Compare layouts"}
-          >
-            <Columns className="w-4 h-4" weight="bold" />
-          </Button>
-          {onArrangementApply && photos.length > 0 && (
-            <Button
-              variant={showCarousel ? "default" : "ghost"}
-              size="sm"
-              onClick={onToggleCarousel}
-              title={showCarousel ? "Close arrangements" : "Explore arrangements"}
-              aria-label={showCarousel ? "Close arrangements" : "Explore arrangements"}
-            >
-              <MagicWand className="w-4 h-4" weight="bold" />
-            </Button>
-          )}
-        </div>
+        )}
       </div>
 
       <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
