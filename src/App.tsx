@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Toaster } from '@/components/ui/sonner'
-import { Trash, Sparkle, ArrowCounterClockwise, ArrowClockwise } from '@phosphor-icons/react'
+import { Trash, Sparkle, ArrowCounterClockwise, ArrowClockwise, UploadSimple, Sliders, GridFour, DownloadSimple } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useCollageHistory, CollageSnapshot } from '@/hooks/use-collage-history'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -29,6 +29,30 @@ function initializePositions(layout: GridLayout, photosArray: UploadedPhoto[]): 
     photoId: photosArray[index]?.id || '',
     gridArea: area,
   }))
+}
+
+function CollapsibleSection({ title, defaultOpen = true, headerAction, children }: {
+  title: string
+  defaultOpen?: boolean
+  headerAction?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <details open={defaultOpen} className="group">
+      <summary className="flex items-center cursor-pointer list-none select-none [&::-webkit-details-marker]:hidden">
+        <div className="flex items-center gap-2 flex-1">
+          <svg className="w-4 h-4 shrink-0 transition-transform group-open:rotate-90 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+          <span className="text-lg font-semibold text-foreground">{title}</span>
+        </div>
+        {headerAction && <div onClick={e => e.stopPropagation()}>{headerAction}</div>}
+      </summary>
+      <Card className="p-6 mt-3">
+        {children}
+      </Card>
+    </details>
+  )
 }
 
 function App() {
@@ -332,8 +356,9 @@ function App() {
                   size="sm"
                   onClick={handleUndo}
                   disabled={!canUndo}
-                  title="Undo (Cmd+Z)"
+                  title="Undo (⌘Z)"
                   aria-label="Undo"
+                  aria-keyshortcuts="Meta+Z"
                 >
                   <ArrowCounterClockwise className="w-4 h-4" weight="bold" />
                 </Button>
@@ -342,8 +367,9 @@ function App() {
                   size="sm"
                   onClick={handleRedo}
                   disabled={!canRedo}
-                  title="Redo (Cmd+Shift+Z)"
+                  title="Redo (⌘⇧Z)"
                   aria-label="Redo"
+                  aria-keyshortcuts="Meta+Shift+Z"
                 >
                   <ArrowClockwise className="w-4 h-4" weight="bold" />
                 </Button>
@@ -402,7 +428,7 @@ function App() {
 
             {selectedLayout && (
               <div>
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-4 sticky top-0 z-10 bg-background py-2">
                   <h2 className="text-lg font-semibold">Preview</h2>
                   <ExportDialog
                     onExport={handleDownload}
@@ -462,28 +488,34 @@ function App() {
           <div className="space-y-6">
             {photos.length > 0 && (
               <>
-                <PresetGallery
-                  onApplyPreset={handleSettingsChange}
-                  currentSettings={settings}
-                />
+                <CollapsibleSection title="Presets" defaultOpen={false}>
+                  <PresetGallery
+                    onApplyPreset={handleSettingsChange}
+                    currentSettings={settings}
+                  />
+                </CollapsibleSection>
 
-                <CustomizationControls
-                  settings={settings}
-                  onSettingsChange={handleSettingsChange}
-                />
+                <CollapsibleSection title="Customize" defaultOpen={true}>
+                  <CustomizationControls
+                    settings={settings}
+                    onSettingsChange={handleSettingsChange}
+                  />
+                </CollapsibleSection>
 
-                <LayoutGallery
-                  layouts={availableLayouts}
-                  photos={photos}
-                  photoPositions={photoPositions}
-                  selectedLayoutId={selectedLayoutId}
-                  onLayoutSelect={handleLayoutSelect}
-                  onArrangementApply={handleArrangementApply}
-                  showCarousel={showCarousel}
-                  onToggleCarousel={handleToggleCarousel}
-                  compareIds={compareIds}
-                  onToggleCompare={handleToggleCompare}
-                />
+                <CollapsibleSection title="Layout Options" defaultOpen={true}>
+                  <LayoutGallery
+                    layouts={availableLayouts}
+                    photos={photos}
+                    photoPositions={photoPositions}
+                    selectedLayoutId={selectedLayoutId}
+                    onLayoutSelect={handleLayoutSelect}
+                    onArrangementApply={handleArrangementApply}
+                    showCarousel={showCarousel}
+                    onToggleCarousel={handleToggleCarousel}
+                    compareIds={compareIds}
+                    onToggleCompare={handleToggleCompare}
+                  />
+                </CollapsibleSection>
               </>
             )}
           </div>
@@ -496,12 +528,40 @@ function App() {
             transition={{ delay: 0.2 }}
             className="text-center py-12"
           >
-            <h2 className="text-2xl font-semibold mb-3 text-foreground">
+            <h2 className="text-2xl font-semibold mb-6 text-foreground">
               Get Started
             </h2>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Upload 1-{MAX_PHOTOS} photos to begin creating your custom collage. 
-              Choose from dozens of beautiful layouts and customize to your liking.
+            <div className="flex items-center justify-center gap-4 sm:gap-6 py-4 flex-wrap">
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <UploadSimple className="w-7 h-7 text-primary" weight="duotone" />
+                </div>
+                <span className="text-sm font-medium text-foreground">Upload</span>
+              </div>
+              <svg className="w-6 h-6 text-muted-foreground/50 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <Sliders className="w-7 h-7 text-primary" weight="duotone" />
+                </div>
+                <span className="text-sm font-medium text-foreground">Customize</span>
+              </div>
+              <svg className="w-6 h-6 text-muted-foreground/50 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <GridFour className="w-7 h-7 text-primary" weight="duotone" />
+                </div>
+                <span className="text-sm font-medium text-foreground">Choose Layout</span>
+              </div>
+              <svg className="w-6 h-6 text-muted-foreground/50 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <DownloadSimple className="w-7 h-7 text-primary" weight="duotone" />
+                </div>
+                <span className="text-sm font-medium text-foreground">Download</span>
+              </div>
+            </div>
+            <p className="text-muted-foreground max-w-md mx-auto mt-4">
+              Upload 1-{MAX_PHOTOS} photos to begin creating your custom collage.
             </p>
           </motion.div>
         )}

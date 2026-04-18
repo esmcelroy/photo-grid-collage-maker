@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react'
 import { CollageSettings } from '@/lib/types'
-import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
@@ -43,9 +42,7 @@ export function CustomizationControls({
   })
 
   return (
-    <Card className="p-6">
-      <h2 className="text-lg font-semibold mb-6">Customize</h2>
-      
+    <div>
       <div className="space-y-6">
         <div ref={gapSliderRef}>
           <div className="flex items-center justify-between mb-3">
@@ -157,6 +154,6 @@ export function CustomizationControls({
           </Popover>
         </div>
       </div>
-    </Card>
+    </div>
   )
 }
