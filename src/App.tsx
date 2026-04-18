@@ -9,6 +9,7 @@ import { PhotoThumbnail } from '@/components/PhotoThumbnail'
 import { LayoutGallery } from '@/components/LayoutGallery'
 import { CollagePreview } from '@/components/CollagePreview'
 import { CustomizationControls } from '@/components/CustomizationControls'
+import { PresetGallery } from '@/components/PresetGallery'
 import { ExportDialog } from '@/components/ExportDialog'
 import { PhotoEditDialog } from '@/components/PhotoEditDialog'
 import { ArrangementCarousel } from '@/components/ArrangementCarousel'
@@ -376,6 +377,11 @@ function App() {
           <div className="space-y-6">
             {photos.length > 0 && (
               <>
+                <PresetGallery
+                  onApplyPreset={handleSettingsChange}
+                  currentSettings={settings}
+                />
+
                 <CustomizationControls
                   settings={settings}
                   onSettingsChange={handleSettingsChange}
