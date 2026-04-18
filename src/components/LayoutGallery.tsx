@@ -1,5 +1,5 @@
-import { useCallback } from 'react'
-import { GridLayout, PhotoPosition, UploadedPhoto } from '@/lib/types'
+import { useCallback, useState, useMemo } from 'react'
+import { GridLayout, PhotoPosition, SocialPlatform, UploadedPhoto } from '@/lib/types'
 import { LayoutOption } from './LayoutOption'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
@@ -7,6 +7,15 @@ import { Button } from '@/components/ui/button'
 import { GridFour, Shuffle, Columns, MagicWand } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { getUniqueAreaNames } from '@/lib/layouts'
+
+const PLATFORM_FILTERS: { value: SocialPlatform | null; label: string }[] = [
+  { value: null, label: 'All' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'facebook', label: 'Facebook' },
+  { value: 'twitter', label: 'Twitter/X' },
+  { value: 'linkedin', label: 'LinkedIn' },
+  { value: 'youtube', label: 'YouTube' },
+]
 
 interface LayoutGalleryProps {
   layouts: GridLayout[]
@@ -34,15 +43,23 @@ export function LayoutGallery({
   onToggleCompare,
 }: LayoutGalleryProps) {
   const isComparing = compareIds.length > 0
+  const [platformFilter, setPlatformFilter] = useState<SocialPlatform | null>(null)
+
+  const filteredLayouts = useMemo(() =>
+    platformFilter
+      ? layouts.filter(l => l.platforms?.includes(platformFilter))
+      : layouts,
+    [layouts, platformFilter]
+  )
 
   const handleShuffle = useCallback(() => {
-    if (layouts.length <= 1) return
+    if (filteredLayouts.length <= 1) return
     let randomId: string
     do {
-      randomId = layouts[Math.floor(Math.random() * layouts.length)].id
-    } while (randomId === selectedLayoutId && layouts.length > 1)
+      randomId = filteredLayouts[Math.floor(Math.random() * filteredLayouts.length)].id
+    } while (randomId === selectedLayoutId && filteredLayouts.length > 1)
     onLayoutSelect(randomId)
-  }, [layouts, selectedLayoutId, onLayoutSelect])
+  }, [filteredLayouts, selectedLayoutId, onLayoutSelect])
 
   if (layouts.length === 0) {
     return (
@@ -68,7 +85,7 @@ export function LayoutGallery({
         </h2>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
-            {layouts.length} {layouts.length === 1 ? 'layout' : 'layouts'}
+            {filteredLayouts.length} {filteredLayouts.length === 1 ? 'layout' : 'layouts'}
           </span>
           <Button
             variant="ghost"
@@ -102,9 +119,23 @@ export function LayoutGallery({
         </div>
       </div>
 
+      <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
+        {PLATFORM_FILTERS.map(({ value, label }) => (
+          <Button
+            key={label}
+            variant={platformFilter === value ? 'default' : 'ghost'}
+            size="sm"
+            className="shrink-0 text-xs"
+            onClick={() => setPlatformFilter(value)}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+
       <ScrollArea className="h-[400px] pr-4">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {layouts.map((layout) => (
+          {filteredLayouts.map((layout) => (
             <div key={layout.id} className="relative">
               <LayoutOption
                 layout={layout}
