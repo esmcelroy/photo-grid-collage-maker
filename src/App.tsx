@@ -52,7 +52,7 @@ function CollapsibleSection({ title, defaultOpen = true, headerAction, children 
         </div>
         {headerAction && <div onClick={e => e.stopPropagation()}>{headerAction}</div>}
       </summary>
-      <Card className="p-6 mt-3">
+      <Card className="p-4 sm:p-6 mt-3">
         {children}
       </Card>
     </details>
@@ -379,15 +379,15 @@ function App() {
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-0">
       <Toaster position="top-right" />
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <header className="mb-8">
+      <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-8 max-w-7xl">
+        <header className="mb-4 sm:mb-8">
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center">
-                <Sparkle className="w-5 h-5 sm:w-6 sm:h-6 text-white" weight="fill" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center">
+                <Sparkle className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" weight="fill" />
               </div>
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-foreground">
                   Collage Maker
                 </h1>
                 <p className="text-muted-foreground hidden sm:block">
@@ -402,7 +402,7 @@ function App() {
                 onClick={cycleTheme}
                 aria-label={themeLabel}
                 title={themeLabel}
-                className="min-h-[44px] min-w-[44px]"
+                className="min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px]"
               >
                 <ThemeIcon className="w-4 h-4" weight="bold" />
               </Button>
@@ -416,7 +416,7 @@ function App() {
                     title="Undo (⌘Z)"
                     aria-label="Undo"
                     aria-keyshortcuts="Meta+Z"
-                    className="min-h-[44px] min-w-[44px]"
+                    className="min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px]"
                   >
                     <ArrowCounterClockwise className="w-4 h-4" weight="bold" />
                   </Button>
@@ -428,7 +428,7 @@ function App() {
                     title="Redo (⌘⇧Z)"
                     aria-label="Redo"
                     aria-keyshortcuts="Meta+Shift+Z"
-                    className="min-h-[44px] min-w-[44px]"
+                    className="min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px]"
                   >
                     <ArrowClockwise className="w-4 h-4" weight="bold" />
                   </Button>
@@ -446,7 +446,7 @@ function App() {
                 currentFileCount={photos.length}
               />
             ) : (
-              <Card className="p-6">
+              <Card className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <h2 className="text-lg font-semibold">Your Photos</h2>
@@ -491,10 +491,12 @@ function App() {
               <div>
                 <div className="flex items-center justify-between mb-4 sticky top-0 z-10 bg-background py-2">
                   <h2 className="text-lg font-semibold">Preview</h2>
-                  <ExportDialog
-                    onExport={handleDownload}
-                    disabled={!selectedLayout}
-                  />
+                  <div className="hidden lg:block">
+                    <ExportDialog
+                      onExport={handleDownload}
+                      disabled={!selectedLayout}
+                    />
+                  </div>
                 </div>
 
                 <AnimatePresence>
@@ -549,29 +551,6 @@ function App() {
           <div className="space-y-6">
             {photos.length > 0 && (
               <>
-                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <MagicWand className="w-4 h-4 text-primary" weight="duotone" />
-                    <span className="text-sm font-medium">Smart Position</span>
-                  </div>
-                  <button
-                    role="switch"
-                    aria-checked={smartPositionEnabled}
-                    onClick={() => setSmartPositionEnabled(!smartPositionEnabled)}
-                    className={cn(
-                      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                      smartPositionEnabled ? "bg-primary" : "bg-muted-foreground/30"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-                        smartPositionEnabled ? "translate-x-6" : "translate-x-1"
-                      )}
-                    />
-                  </button>
-                </div>
-
                 <CollapsibleSection title="Presets" defaultOpen={false}>
                   <PresetGallery
                     onApplyPreset={handleSettingsChange}
@@ -580,6 +559,28 @@ function App() {
                 </CollapsibleSection>
 
                 <CollapsibleSection title="Customize" defaultOpen={true}>
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg mb-4">
+                    <div className="flex items-center gap-2">
+                      <MagicWand className="w-4 h-4 text-primary" weight="duotone" />
+                      <span className="text-sm font-medium">Smart Position</span>
+                    </div>
+                    <button
+                      role="switch"
+                      aria-checked={smartPositionEnabled}
+                      onClick={() => setSmartPositionEnabled(!smartPositionEnabled)}
+                      className={cn(
+                        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                        smartPositionEnabled ? "bg-primary" : "bg-muted-foreground/30"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                          smartPositionEnabled ? "translate-x-6" : "translate-x-1"
+                        )}
+                      />
+                    </button>
+                  </div>
                   <CustomizationControls
                     settings={settings}
                     onSettingsChange={handleSettingsChange}
@@ -615,33 +616,33 @@ function App() {
             <h2 className="text-2xl font-semibold mb-6 text-foreground">
               Get Started
             </h2>
-            <div className="flex items-center justify-center gap-4 sm:gap-6 py-4 flex-wrap">
+            <div className="grid grid-cols-4 gap-1 sm:flex sm:items-center sm:justify-center sm:gap-6 py-4">
               <div className="flex flex-col items-center gap-2">
                 <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <UploadSimple className="w-5 h-5 sm:w-7 sm:h-7 text-primary" weight="duotone" />
                 </div>
-                <span className="text-sm font-medium text-foreground">Upload</span>
+                <span className="text-xs sm:text-sm font-medium text-foreground">Upload</span>
               </div>
-              <svg className="w-6 h-6 text-muted-foreground/50 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+              <svg className="w-6 h-6 text-muted-foreground/50 shrink-0 hidden sm:inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
               <div className="flex flex-col items-center gap-2">
                 <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <Sliders className="w-5 h-5 sm:w-7 sm:h-7 text-primary" weight="duotone" />
                 </div>
-                <span className="text-sm font-medium text-foreground">Customize</span>
+                <span className="text-xs sm:text-sm font-medium text-foreground">Customize</span>
               </div>
-              <svg className="w-6 h-6 text-muted-foreground/50 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+              <svg className="w-6 h-6 text-muted-foreground/50 shrink-0 hidden sm:inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
               <div className="flex flex-col items-center gap-2">
                 <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <GridFour className="w-5 h-5 sm:w-7 sm:h-7 text-primary" weight="duotone" />
                 </div>
-                <span className="text-sm font-medium text-foreground">Choose Layout</span>
+                <span className="text-xs sm:text-sm font-medium text-foreground"><span className="sm:hidden">Layout</span><span className="hidden sm:inline">Choose Layout</span></span>
               </div>
-              <svg className="w-6 h-6 text-muted-foreground/50 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+              <svg className="w-6 h-6 text-muted-foreground/50 shrink-0 hidden sm:inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
               <div className="flex flex-col items-center gap-2">
                 <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <DownloadSimple className="w-5 h-5 sm:w-7 sm:h-7 text-primary" weight="duotone" />
                 </div>
-                <span className="text-sm font-medium text-foreground">Download</span>
+                <span className="text-xs sm:text-sm font-medium text-foreground">Download</span>
               </div>
             </div>
             <p className="text-muted-foreground max-w-md mx-auto mt-4">
