@@ -14,6 +14,8 @@ export interface PhotoPosition {
   scale?: number          // 1.0 = fit, >1.0 = zoomed in
 }
 
+export type SocialPlatform = 'instagram' | 'facebook' | 'twitter' | 'linkedin' | 'youtube'
+
 export interface GridLayout {
   id: string
   name: string
@@ -21,6 +23,7 @@ export interface GridLayout {
   gridTemplate: string
   areas: string[]
   aspectRatio?: string
+  platforms?: SocialPlatform[]
 }
 
 export interface CollageSettings {

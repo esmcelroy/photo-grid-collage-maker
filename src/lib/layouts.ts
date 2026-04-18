@@ -1,4 +1,4 @@
-import { GridLayout } from './types'
+import { GridLayout, SocialPlatform } from './types'
 
 export const GRID_LAYOUTS: GridLayout[] = [
   {
@@ -7,7 +7,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 1,
     gridTemplate: '1fr',
     areas: ['a'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '1-portrait',
@@ -15,7 +16,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 1,
     gridTemplate: '1fr',
     areas: ['a'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
   {
     id: '1-square',
@@ -23,7 +25,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 1,
     gridTemplate: '1fr',
     areas: ['a'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '1-landscape',
@@ -31,7 +34,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 1,
     gridTemplate: '1fr',
     areas: ['a'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '1-wide',
@@ -39,7 +43,26 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 1,
     gridTemplate: '1fr',
     areas: ['a'],
-    aspectRatio: '21/9'
+    aspectRatio: '21/9',
+    platforms: ['youtube'],
+  },
+  {
+    id: '1-story',
+    name: 'Instagram Story',
+    photoCount: 1,
+    gridTemplate: '1fr',
+    areas: ['a'],
+    aspectRatio: '9/16',
+    platforms: ['instagram', 'facebook', 'youtube'],
+  },
+  {
+    id: '1-instagram-post',
+    name: 'Instagram Post',
+    photoCount: 1,
+    gridTemplate: '1fr',
+    areas: ['a'],
+    aspectRatio: '4/5',
+    platforms: ['instagram'],
   },
   
   {
@@ -48,7 +71,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 2,
     gridTemplate: '1fr 1fr',
     areas: ['a', 'b'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '2-vertical',
@@ -56,7 +80,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 2,
     gridTemplate: '1fr / 1fr',
     areas: ['a', 'b'],
-    aspectRatio: '9/16'
+    aspectRatio: '9/16',
+    platforms: ['instagram', 'facebook', 'youtube'],
   },
   {
     id: '2-left-large',
@@ -64,7 +89,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 2,
     gridTemplate: '2fr 1fr',
     areas: ['a', 'b'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '2-right-large',
@@ -72,7 +98,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 2,
     gridTemplate: '1fr 2fr',
     areas: ['a', 'b'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '2-top-large',
@@ -80,7 +107,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 2,
     gridTemplate: '2fr 1fr / 1fr',
     areas: ['a', 'b'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
   {
     id: '2-bottom-large',
@@ -88,7 +116,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 2,
     gridTemplate: '1fr 2fr / 1fr',
     areas: ['a', 'b'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
   {
     id: '2-square',
@@ -96,7 +125,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 2,
     gridTemplate: '1fr 1fr',
     areas: ['a', 'b'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
   
   {
@@ -105,7 +135,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 3,
     gridTemplate: '1fr 1fr 1fr',
     areas: ['a', 'b', 'c'],
-    aspectRatio: '21/9'
+    aspectRatio: '21/9',
+    platforms: ['youtube'],
   },
   {
     id: '3-column',
@@ -113,7 +144,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 3,
     gridTemplate: '1fr / 1fr 1fr 1fr',
     areas: ['a', 'b', 'c'],
-    aspectRatio: '9/16'
+    aspectRatio: '9/16',
+    platforms: ['instagram', 'facebook', 'youtube'],
   },
   {
     id: '3-left-stack',
@@ -121,7 +153,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 3,
     gridTemplate: '1fr 1fr / 2fr 1fr',
     areas: ['a a', 'b c'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '3-right-stack',
@@ -129,7 +162,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 3,
     gridTemplate: '1fr 1fr / 1fr 2fr',
     areas: ['a b b', 'a c c'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '3-top-row',
@@ -137,7 +171,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 3,
     gridTemplate: '1fr 1fr / 1fr 1fr',
     areas: ['a a', 'b c'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '3-bottom-row',
@@ -145,7 +180,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 3,
     gridTemplate: '1fr 1fr / 1fr 1fr',
     areas: ['a b', 'c c'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '3-center-focus',
@@ -153,7 +189,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 3,
     gridTemplate: '1fr 2fr 1fr',
     areas: ['a', 'b', 'c'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '3-pyramid',
@@ -161,7 +198,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 3,
     gridTemplate: '1fr 1fr / 1fr 1fr',
     areas: ['a a', 'b c'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '3-l-shape',
@@ -169,7 +207,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 3,
     gridTemplate: '1fr 1fr / 1fr 1fr',
     areas: ['a b', 'a c'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
   
   {
@@ -178,7 +217,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 4,
     gridTemplate: '1fr 1fr / 1fr 1fr',
     areas: ['a b', 'c d'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '4-row',
@@ -186,7 +226,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 4,
     gridTemplate: '1fr 1fr 1fr 1fr',
     areas: ['a', 'b', 'c', 'd'],
-    aspectRatio: '21/9'
+    aspectRatio: '21/9',
+    platforms: ['youtube'],
   },
   {
     id: '4-column',
@@ -202,7 +243,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 4,
     gridTemplate: '1fr 1fr / 2fr 1fr',
     areas: ['a b', 'a c', 'a d'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '4-right-focus',
@@ -210,7 +252,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 4,
     gridTemplate: '1fr 1fr 1fr / 1fr 2fr',
     areas: ['a b', 'c b', 'd b'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '4-top-bottom',
@@ -218,7 +261,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 4,
     gridTemplate: '1fr 1fr / 1fr 1fr',
     areas: ['a b', 'c d'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '4-center-focus',
@@ -226,7 +270,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 4,
     gridTemplate: '1fr 2fr 1fr / 1fr 1fr',
     areas: ['a a', 'b c', 'd d'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
   {
     id: '4-t-shape',
@@ -234,7 +279,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 4,
     gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
     areas: ['a a a', 'b c d'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '4-corners',
@@ -242,7 +288,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 4,
     gridTemplate: '1fr 1fr / 1fr 1fr',
     areas: ['a b', 'c d'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   
   {
@@ -251,7 +298,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 5,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
     areas: ['a b a', 'c d e', 'a b a'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '5-top-one',
@@ -259,7 +307,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 5,
     gridTemplate: '2fr 1fr / 1fr 1fr 1fr 1fr',
     areas: ['a a a a', 'b c d e'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '5-left-two',
@@ -267,7 +316,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 5,
     gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
     areas: ['a b c', 'd e e'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '5-grid-top',
@@ -275,7 +325,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 5,
     gridTemplate: '1fr 1fr / 1fr 1fr',
     areas: ['a a', 'b c', 'd e'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
   {
     id: '5-center',
@@ -283,7 +334,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 5,
     gridTemplate: '1fr 1fr / 1fr 2fr 1fr',
     areas: ['a b c', 'd e e'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '5-pyramid',
@@ -291,7 +343,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 5,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr',
     areas: ['a a', 'b c', 'd e'],
-    aspectRatio: '4/5'
+    aspectRatio: '4/5',
+    platforms: ['instagram'],
   },
   {
     id: '5-scattered',
@@ -299,7 +352,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 5,
     gridTemplate: '1fr 1fr / 2fr 1fr 1fr',
     areas: ['a a b', 'c d e'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '5-bottom-row',
@@ -307,7 +361,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 5,
     gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
     areas: ['a a b', 'c d e'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   
   {
@@ -316,7 +371,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 6,
     gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
     areas: ['a b c', 'd e f'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '6-grid-vertical',
@@ -324,7 +380,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 6,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr',
     areas: ['a b', 'c d', 'e f'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
   {
     id: '6-two-rows',
@@ -332,7 +389,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 6,
     gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
     areas: ['a b c', 'd e f'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '6-left-hero',
@@ -340,7 +398,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 6,
     gridTemplate: '1fr 1fr / 2fr 1fr 1fr',
     areas: ['a b c', 'a d e', 'a f f'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '6-center-large',
@@ -348,7 +407,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 6,
     gridTemplate: '1fr 1fr / 1fr 2fr 1fr',
     areas: ['a b c', 'd e f'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '6-bookends',
@@ -356,7 +416,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 6,
     gridTemplate: '1fr 1fr / 2fr 1fr 1fr 2fr',
     areas: ['a b c d', 'a e f d'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '6-top-bottom',
@@ -364,7 +425,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 6,
     gridTemplate: '2fr 1fr 2fr / 1fr 1fr',
     areas: ['a a', 'b c', 'd d', 'e f'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
   {
     id: '6-scattered',
@@ -372,7 +434,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 6,
     gridTemplate: '1fr 1fr / 2fr 1fr 1fr',
     areas: ['a a b', 'c d e', 'f f f'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   
   {
@@ -381,7 +444,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 7,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
     areas: ['a b c', 'd e f', 'g g g'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '7-top-hero',
@@ -389,7 +453,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 7,
     gridTemplate: '2fr 1fr 1fr / 1fr 1fr 1fr',
     areas: ['a a a', 'b c d', 'e f g'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '7-left-column',
@@ -397,7 +462,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 7,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
     areas: ['a b c', 'a d e', 'f g g'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '7-center-focus',
@@ -405,7 +471,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 7,
     gridTemplate: '1fr 1fr 1fr / 1fr 2fr 1fr',
     areas: ['a b c', 'd e f', 'g e g'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '7-rows',
@@ -413,7 +480,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 7,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
     areas: ['a a b', 'c d e', 'f g g'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '7-asymmetric',
@@ -421,7 +489,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 7,
     gridTemplate: '1fr 1fr / 2fr 1fr 1fr',
     areas: ['a a b', 'c d e', 'f g g'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '7-bottom-row',
@@ -429,7 +498,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 7,
     gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
     areas: ['a b c', 'd e f', 'g g g'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   
   {
@@ -438,7 +508,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 8,
     gridTemplate: '1fr 1fr / 1fr 1fr 1fr 1fr',
     areas: ['a b c d', 'e f g h'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '8-grid-tall',
@@ -446,7 +517,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 8,
     gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr',
     areas: ['a b', 'c d', 'e f', 'g h'],
-    aspectRatio: '9/16'
+    aspectRatio: '9/16',
+    platforms: ['instagram', 'facebook', 'youtube'],
   },
   {
     id: '8-center-large',
@@ -454,7 +526,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 8,
     gridTemplate: '1fr 2fr 1fr / 1fr 2fr 1fr',
     areas: ['a b c', 'd e f', 'g h h'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '8-sides',
@@ -462,7 +535,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 8,
     gridTemplate: '1fr 1fr 1fr 1fr / 1fr 2fr 1fr',
     areas: ['a b c', 'd e f', 'g e h'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '8-top-bottom',
@@ -470,7 +544,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 8,
     gridTemplate: '1fr 1fr / 1fr 1fr 1fr 1fr',
     areas: ['a b c d', 'e f g h'],
-    aspectRatio: '21/9'
+    aspectRatio: '21/9',
+    platforms: ['youtube'],
   },
   {
     id: '8-mixed',
@@ -478,7 +553,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 8,
     gridTemplate: '1fr 1fr / 2fr 1fr 1fr',
     areas: ['a a b', 'c d e', 'f g h'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '8-corners',
@@ -486,7 +562,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 8,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
     areas: ['a b c', 'd d d', 'e f g', 'h h h'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
   
   {
@@ -495,7 +572,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 9,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
     areas: ['a b c', 'd e f', 'g h i'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '9-center-large',
@@ -503,7 +581,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 9,
     gridTemplate: '1fr 2fr 1fr / 1fr 2fr 1fr',
     areas: ['a b c', 'd e f', 'g h i'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '9-corners-large',
@@ -511,7 +590,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 9,
     gridTemplate: '2fr 1fr 2fr / 2fr 1fr 2fr',
     areas: ['a b c', 'd e f', 'g h i'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '9-cross',
@@ -519,7 +599,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 9,
     gridTemplate: '1fr 1fr 1fr / 1fr 2fr 1fr',
     areas: ['a b c', 'd e f', 'g h i'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '9-rows',
@@ -527,7 +608,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 9,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
     areas: ['a b c', 'd e f', 'g h i'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '9-columns',
@@ -535,7 +617,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 9,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
     areas: ['a b c', 'd e f', 'g h i'],
-    aspectRatio: '9/16'
+    aspectRatio: '9/16',
+    platforms: ['instagram', 'facebook', 'youtube'],
   },
   {
     id: '9-pyramid',
@@ -543,7 +626,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 9,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
     areas: ['a a b b', 'c d e e', 'f g h i'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '9-frame',
@@ -551,7 +635,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 9,
     gridTemplate: '1fr 2fr 1fr / 1fr 2fr 1fr',
     areas: ['a b c', 'd e f', 'g h i'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
 
   // ─── 10 photos ──────────────────────────────────────────────────────────────
@@ -561,7 +646,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 10,
     gridTemplate: '1fr 1fr / 1fr 1fr 1fr 1fr 1fr',
     areas: ['a b c d e', 'f g h i j'],
-    aspectRatio: '21/9'
+    aspectRatio: '21/9',
+    platforms: ['youtube'],
   },
   {
     id: '10-grid-5x2',
@@ -577,7 +663,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 10,
     gridTemplate: '2fr 1fr 1fr / 1fr 1fr 1fr',
     areas: ['a a a', 'b c d', 'e f g', 'h i j'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '10-mosaic',
@@ -585,7 +672,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 10,
     gridTemplate: '1fr 1fr 1fr / 2fr 1fr 1fr',
     areas: ['a a b', 'c d e', 'f g g', 'h i j'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
   {
     id: '10-classic-grid',
@@ -593,7 +681,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 10,
     gridTemplate: '1fr 1fr 1fr 1fr 1fr / 1fr 1fr',
     areas: ['a b', 'c d', 'e f', 'g h', 'i j'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
 
   // ─── 11 photos ──────────────────────────────────────────────────────────────
@@ -603,7 +692,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 11,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
     areas: ['a b c c', 'd e f g', 'h i j k'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '11-left-hero',
@@ -611,7 +701,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 11,
     gridTemplate: '1fr 1fr 1fr / 2fr 1fr 1fr 1fr',
     areas: ['a b c d', 'a e f g', 'a h i j', 'a k k k'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '11-mixed',
@@ -619,7 +710,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 11,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
     areas: ['a a b', 'c d e', 'f g h', 'i j k'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
   {
     id: '11-top-bottom',
@@ -627,7 +719,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 11,
     gridTemplate: '2fr 1fr 1fr 2fr / 1fr 1fr 1fr',
     areas: ['a a a', 'b c d', 'e f g', 'h i j', 'k k k'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
 
   // ─── 12 photos ──────────────────────────────────────────────────────────────
@@ -637,7 +730,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 12,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
     areas: ['a b c d', 'e f g h', 'i j k l'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '12-grid-4x3',
@@ -645,7 +739,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 12,
     gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr 1fr',
     areas: ['a b c', 'd e f', 'g h i', 'j k l'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
   {
     id: '12-grid-2x6',
@@ -653,7 +748,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 12,
     gridTemplate: '1fr 1fr / 1fr 1fr 1fr 1fr 1fr 1fr',
     areas: ['a b c d e f', 'g h i j k l'],
-    aspectRatio: '21/9'
+    aspectRatio: '21/9',
+    platforms: ['youtube'],
   },
   {
     id: '12-hero-mosaic',
@@ -661,7 +757,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 12,
     gridTemplate: '2fr 1fr 1fr / 1fr 1fr 1fr 1fr',
     areas: ['a a b b', 'c d e f', 'g h i j', 'k k l l'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '12-mixed',
@@ -669,7 +766,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 12,
     gridTemplate: '1fr 1fr 1fr / 2fr 1fr 1fr 1fr',
     areas: ['a a b c', 'd e f g', 'h i j j', 'k k l l'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
 
   // ─── 13 photos ──────────────────────────────────────────────────────────────
@@ -679,7 +777,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 13,
     gridTemplate: '2fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
     areas: ['a a a a', 'b c d e', 'f g h i', 'j k l m'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
   {
     id: '13-asymmetric',
@@ -687,7 +786,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 13,
     gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
     areas: ['a b c c', 'd e f g', 'h i j k', 'l l m m'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '13-mixed',
@@ -695,7 +795,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 13,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr 1fr 1fr',
     areas: ['a b c d e', 'f g g h h', 'i j k l m'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '13-mosaic',
@@ -703,7 +804,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 13,
     gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr 1fr',
     areas: ['a a b', 'c d e', 'f g h', 'i j j', 'k l m'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
 
   // ─── 14 photos ──────────────────────────────────────────────────────────────
@@ -713,7 +815,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 14,
     gridTemplate: '1fr 1fr / 1fr 1fr 1fr 1fr 1fr 1fr 1fr',
     areas: ['a b c d e f g', 'h i j k l m n'],
-    aspectRatio: '21/9'
+    aspectRatio: '21/9',
+    platforms: ['youtube'],
   },
   {
     id: '14-grid-7x2',
@@ -729,7 +832,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 14,
     gridTemplate: '2fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
     areas: ['a a a a', 'a a a a', 'b c d e', 'f g h i', 'j k l m', 'n n n n'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
   {
     id: '14-mixed',
@@ -737,7 +841,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 14,
     gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr 1fr',
     areas: ['a b c d d', 'e f g h h', 'i j k l m', 'n n n n n'],
-    aspectRatio: '4/3'
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
   },
 
   // ─── 15 photos ──────────────────────────────────────────────────────────────
@@ -747,7 +852,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 15,
     gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr 1fr 1fr',
     areas: ['a b c d e', 'f g h i j', 'k l m n o'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '15-grid-5x3',
@@ -755,7 +861,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 15,
     gridTemplate: '1fr 1fr 1fr 1fr 1fr / 1fr 1fr 1fr',
     areas: ['a b c', 'd e f', 'g h i', 'j k l', 'm n o'],
-    aspectRatio: '9/16'
+    aspectRatio: '9/16',
+    platforms: ['instagram', 'facebook', 'youtube'],
   },
   {
     id: '15-hero-grid',
@@ -763,7 +870,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 15,
     gridTemplate: '2fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
     areas: ['a a b b', 'c d e f', 'g h i j', 'k l m n', 'o o o o'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
   {
     id: '15-pyramid',
@@ -771,7 +879,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 15,
     gridTemplate: '1fr 1fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr 1fr',
     areas: ['a a a b b', 'c d e f f', 'g h i j k', 'l l m n n', 'o o o o o'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
 
   // ─── 16 photos ──────────────────────────────────────────────────────────────
@@ -781,7 +890,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 16,
     gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
     areas: ['a b c d', 'e f g h', 'i j k l', 'm n o p'],
-    aspectRatio: '1/1'
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '16-wide-grid',
@@ -789,7 +899,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 16,
     gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
     areas: ['a b c d', 'e f g h', 'i j k l', 'm n o p'],
-    aspectRatio: '16/9'
+    aspectRatio: '16/9',
+    platforms: ['youtube', 'facebook', 'twitter', 'linkedin'],
   },
   {
     id: '16-hero-grid',
@@ -797,7 +908,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 16,
     gridTemplate: '2fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr',
     areas: ['a a b b', 'c d e f', 'g h i j', 'k l m n', 'o o p p'],
-    aspectRatio: '3/4'
+    aspectRatio: '3/4',
+    platforms: ['instagram'],
   },
   {
     id: '16-mixed',
@@ -805,8 +917,56 @@ export const GRID_LAYOUTS: GridLayout[] = [
     photoCount: 16,
     gridTemplate: '1fr 1fr 1fr 1fr / 1fr 1fr 1fr 1fr 1fr',
     areas: ['a a b c d', 'e f g h h', 'i j k l m', 'n n o o p'],
-    aspectRatio: '4/3'
-  }
+    aspectRatio: '4/3',
+    platforms: ['facebook'],
+  },
+
+  // ─── Social media specific layouts ──────────────────────────────────────────
+  {
+    id: '2-instagram-post',
+    name: 'Instagram Post Split',
+    photoCount: 2,
+    gridTemplate: '1fr 1fr',
+    areas: ['a', 'b'],
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
+  },
+  {
+    id: '2-instagram-portrait',
+    name: 'Instagram Portrait Split',
+    photoCount: 2,
+    gridTemplate: '1fr 1fr',
+    areas: ['a', 'b'],
+    aspectRatio: '4/5',
+    platforms: ['instagram'],
+  },
+  {
+    id: '3-instagram-post',
+    name: 'Instagram Post Triptych',
+    photoCount: 3,
+    gridTemplate: '1fr 1fr 1fr',
+    areas: ['a', 'b', 'c'],
+    aspectRatio: '1/1',
+    platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
+  },
+  {
+    id: '3-instagram-portrait',
+    name: 'Instagram Portrait Stack',
+    photoCount: 3,
+    gridTemplate: '1fr 1fr / 1fr 1fr',
+    areas: ['a a', 'b c'],
+    aspectRatio: '4/5',
+    platforms: ['instagram'],
+  },
+  {
+    id: '4-instagram-post',
+    name: 'Instagram Post Grid',
+    photoCount: 4,
+    gridTemplate: '1fr 1fr / 1fr 1fr',
+    areas: ['a b', 'c d'],
+    aspectRatio: '4/5',
+    platforms: ['instagram'],
+  },
 ]
 
 export function getLayoutsForPhotoCount(count: number): GridLayout[] {
@@ -829,4 +989,15 @@ export function getUniqueAreaNames(areas: string[]): string[] {
     }
   }
   return result
+}
+
+export function getLayoutsForPlatform(platform: SocialPlatform): GridLayout[] {
+  return GRID_LAYOUTS.filter(layout => layout.platforms?.includes(platform))
+}
+
+export function getLayoutsForPhotoCountAndPlatform(count: number, platform: SocialPlatform | null): GridLayout[] {
+  return GRID_LAYOUTS.filter(layout =>
+    layout.photoCount === count &&
+    (platform === null || layout.platforms?.includes(platform))
+  )
 }
