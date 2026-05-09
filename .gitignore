@@ -41,3 +41,4 @@ todos.db
 todos.db-shm
 todos.db-wal
 test-results/
+.playwright-mcp/

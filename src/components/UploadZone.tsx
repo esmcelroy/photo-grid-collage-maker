@@ -2,13 +2,28 @@ import { useCallback, useState } from 'react'
 import { UploadSimple, Image as ImageIcon } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { MAX_PHOTOS } from '@/lib/types'
+import { toast } from 'sonner'
 
 const HEIC_EXTENSIONS = ['.heic', '.heif']
+const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50 MB per file
 
 function isImageOrHeic(file: File): boolean {
   if (file.type.startsWith('image/')) return true
   const ext = '.' + file.name.split('.').pop()?.toLowerCase()
   return HEIC_EXTENSIONS.includes(ext)
+}
+
+function filterAndValidateFiles(files: File[]): File[] {
+  const valid: File[] = []
+  for (const file of files) {
+    if (!isImageOrHeic(file)) continue
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error(`${file.name} exceeds 50 MB limit`)
+      continue
+    }
+    valid.push(file)
+  }
+  return valid
 }
 
 interface UploadZoneProps {
@@ -28,7 +43,7 @@ export function UploadZone({
     e.preventDefault()
     setIsDragging(false)
     
-    const files = Array.from(e.dataTransfer.files).filter(isImageOrHeic)
+    const files = filterAndValidateFiles(Array.from(e.dataTransfer.files))
     
     const remainingSlots = maxFiles - currentFileCount
     const filesToAdd = files.slice(0, remainingSlots)
@@ -39,7 +54,7 @@ export function UploadZone({
   }, [onFilesSelected, maxFiles, currentFileCount])
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).filter(isImageOrHeic)
+    const files = filterAndValidateFiles(Array.from(e.target.files || []))
     const remainingSlots = maxFiles - currentFileCount
     const filesToAdd = files.slice(0, remainingSlots)
     

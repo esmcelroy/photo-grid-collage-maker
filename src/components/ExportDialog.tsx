@@ -43,7 +43,12 @@ export function ExportDialog({ onExport, disabled, trigger }: ExportDialogProps)
 
   const handleExport = () => {
     const ext = format === 'jpeg' ? '.jpg' : '.png'
-    const name = filename.trim() || `collage-${Date.now()}`
+    const sanitized = filename.trim()
+      .replace(/[/\\:*?"<>|]/g, '_')
+      .replace(/\0/g, '')
+      .replace(/^\.+/, '')
+      .substring(0, 200)
+    const name = sanitized || `collage-${Date.now()}`
     const finalFilename = name.endsWith(ext) ? name : `${name}${ext}`
 
     onExport({
