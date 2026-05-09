@@ -48,7 +48,7 @@ describe('layout structure validation', () => {
   it.each(GRID_LAYOUTS.map(l => [l.id, l]))('layout %s has correct photo count', (_id, layout) => {
     const l = layout as (typeof GRID_LAYOUTS)[number]
     const uniqueAreas = new Set<string>()
-    l.areas.forEach(row => row.split(' ').forEach(c => uniqueAreas.add(c)))
+    l.areas.forEach(row => row.split(' ').forEach(c => { if (c !== '.') uniqueAreas.add(c) }))
     expect(uniqueAreas.size).toBe(l.photoCount)
   })
 
@@ -56,6 +56,30 @@ describe('layout structure validation', () => {
     const l = layout as (typeof GRID_LAYOUTS)[number]
     expect(l.platforms).toBeDefined()
     expect(l.platforms!.length).toBeGreaterThan(0)
+  })
+
+  it.each(GRID_LAYOUTS.map(l => [l.id, l]))('layout %s has valid CSS grid areas (contiguous rectangles)', (_id, layout) => {
+    const l = layout as (typeof GRID_LAYOUTS)[number]
+    const areaPositions = new Map<string, Array<[number, number]>>()
+
+    l.areas.forEach((row, rowIdx) => {
+      row.split(' ').forEach((name, colIdx) => {
+        if (name === '.') return
+        if (!areaPositions.has(name)) areaPositions.set(name, [])
+        areaPositions.get(name)!.push([rowIdx, colIdx])
+      })
+    })
+
+    for (const [name, positions] of areaPositions) {
+      const rows = positions.map(p => p[0])
+      const cols = positions.map(p => p[1])
+      const minRow = Math.min(...rows)
+      const maxRow = Math.max(...rows)
+      const minCol = Math.min(...cols)
+      const maxCol = Math.max(...cols)
+      const expectedCount = (maxRow - minRow + 1) * (maxCol - minCol + 1)
+      expect(positions.length).toBe(expectedCount)
+    }
   })
 
   it('has no duplicate layout IDs', () => {
