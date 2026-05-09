@@ -21,8 +21,8 @@ test.describe('Layout Enhancements', () => {
     
     // Check platform filter buttons are visible
     await expect(page.getByRole('button', { name: 'All', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Instagram' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Facebook' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Instagram', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Facebook', exact: true })).toBeVisible()
   })
 
   test('platform filter reduces visible layouts', async ({ page }) => {
@@ -35,7 +35,7 @@ test.describe('Layout Enhancements', () => {
     await expect(layoutHeading).toBeVisible({ timeout: 5000 })
     
     // Click Instagram filter
-    await page.getByRole('button', { name: 'Instagram' }).click()
+    await page.getByRole('button', { name: 'Instagram', exact: true }).click()
     await page.waitForTimeout(500)
     
     // Verify filter is active and layouts still shown
