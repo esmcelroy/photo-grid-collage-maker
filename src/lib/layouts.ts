@@ -297,8 +297,8 @@ export const GRID_LAYOUTS: GridLayout[] = [
     id: '5-plus',
     name: 'Plus Sign',
     photoCount: 5,
-    gridTemplate: '1fr 1fr 1fr / 1fr 1fr 1fr',
-    areas: ['a b a', 'c d e', 'a b a'],
+    gridTemplate: '1fr 2fr 1fr / 1fr 2fr 1fr',
+    areas: ['. a .', 'b c d', '. e .'],
     aspectRatio: '1/1',
     platforms: ['instagram', 'facebook', 'twitter', 'linkedin'],
   },
@@ -471,7 +471,7 @@ export const GRID_LAYOUTS: GridLayout[] = [
     name: 'Center Focus',
     photoCount: 7,
     gridTemplate: '1fr 1fr 1fr / 1fr 2fr 1fr',
-    areas: ['a b c', 'd e f', 'g e g'],
+    areas: ['a b c', 'd b e', 'f b g'],
     aspectRatio: '4/3',
     platforms: ['facebook'],
   },
@@ -985,7 +985,7 @@ export function getUniqueAreaNames(areas: string[]): string[] {
   const result: string[] = []
   for (const row of areas) {
     for (const name of row.split(' ')) {
-      if (!seen.has(name)) {
+      if (name !== '.' && !seen.has(name)) {
         seen.add(name)
         result.push(name)
       }
