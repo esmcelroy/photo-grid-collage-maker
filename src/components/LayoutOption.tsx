@@ -1,3 +1,4 @@
+import { KeyboardEvent } from 'react'
 import { GridLayout, PhotoPosition, UploadedPhoto } from '@/lib/types'
 import { getUniqueAreaNames } from '@/lib/layouts'
 import { cn } from '@/lib/utils'
@@ -18,6 +19,12 @@ export function LayoutOption({
   isSelected, 
   onSelect 
 }: LayoutOptionProps) {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect()
+    }
+  }
   const getPhotoForArea = (area: string): UploadedPhoto | undefined => {
     const position = photoPositions.find(p => p.gridArea === area)
     if (!position) return undefined
@@ -33,11 +40,17 @@ export function LayoutOption({
       className={cn(
         "relative cursor-pointer transition-all duration-300 overflow-hidden group",
         "hover:shadow-lg hover:scale-[1.02]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         isSelected 
           ? "ring-2 ring-accent shadow-md bg-accent/5" 
           : "hover:ring-2 hover:ring-accent/50"
       )}
       onClick={onSelect}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      role="button"
+      aria-label={`Select ${layout.name} layout`}
+      aria-pressed={isSelected}
     >
       <div className="p-3">
         <div
@@ -76,10 +89,13 @@ export function LayoutOption({
           })}
         </div>
         
-        <p className={cn(
-          "text-xs font-medium text-center mt-2 transition-colors",
-          isSelected ? "text-accent" : "text-muted-foreground"
-        )}>
+        <p 
+          className={cn(
+            "text-xs font-medium text-center mt-2 transition-colors truncate",
+            isSelected ? "text-accent" : "text-muted-foreground"
+          )}
+          title={layout.name}
+        >
           {layout.name}
         </p>
       </div>

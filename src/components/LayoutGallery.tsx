@@ -113,18 +113,21 @@ export function LayoutGallery({
         )}
       </div>
 
-      <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
-        {PLATFORM_FILTERS.map(({ value, label }) => (
-          <Button
-            key={label}
-            variant={platformFilter === value ? 'default' : 'ghost'}
-            size="sm"
-            className="shrink-0 text-xs"
-            onClick={() => setPlatformFilter(value)}
-          >
-            {label}
-          </Button>
-        ))}
+      <div className="relative mb-4">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+          {PLATFORM_FILTERS.map(({ value, label }) => (
+            <Button
+              key={label}
+              variant={platformFilter === value ? 'default' : 'ghost'}
+              size="sm"
+              className="shrink-0 text-xs"
+              onClick={() => setPlatformFilter(value)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+        <div className="absolute right-0 top-0 bottom-1 w-8 bg-gradient-to-l from-card to-transparent pointer-events-none" aria-hidden="true" />
       </div>
 
       <ScrollArea className="h-[400px] pr-4">
