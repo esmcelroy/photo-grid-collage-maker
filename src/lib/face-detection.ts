@@ -1,3 +1,6 @@
+import type { PhotoOrientation } from './image-analysis'
+import { smartCropToObjectPosition, analyzeImage } from './image-analysis'
+
 export interface DetectedRegion {
   x: number      // 0-1 normalized
   y: number      // 0-1 normalized
@@ -12,6 +15,12 @@ export interface PhotoAnalysis {
   regions: DetectedRegion[]
   subjectCenter: { x: number, y: number } // weighted center of all detected subjects
   analyzedAt: number // timestamp
+  // Enhanced analysis fields (Phase 1)
+  aspectRatio?: number
+  orientation?: PhotoOrientation
+  sharpnessScore?: number
+  smartCrop?: { x: number; y: number; width: number; height: number }
+  exifOrientation?: number
 }
 
 const analysisCache = new Map<string, PhotoAnalysis>()
@@ -137,7 +146,51 @@ export async function analyzePhoto(photoId: string, dataUrl: string): Promise<Ph
     }
   }
 
-  return { photoId, regions, subjectCenter, analyzedAt: Date.now() }
+  // Enhanced analysis: aspect ratio, sharpness, smartcrop
+  let enhancedFields: Partial<PhotoAnalysis> = {}
+  try {
+    const img = new Image()
+    img.src = dataUrl
+    await new Promise(resolve => { img.onload = resolve })
+
+    const w = img.naturalWidth || img.width
+    const h = img.naturalHeight || img.height
+    if (w > 0 && h > 0) {
+      // Convert face regions to smartcrop boost format
+      const boosts = faces.map(f => ({
+        x: f.x * w,
+        y: f.y * h,
+        width: f.width * w,
+        height: f.height * h,
+        weight: 1.0,
+      }))
+
+      const analysis = await analyzeImage(img, boosts.length > 0 ? boosts : undefined)
+      enhancedFields = {
+        aspectRatio: analysis.aspectRatio,
+        orientation: analysis.orientation,
+        sharpnessScore: analysis.sharpnessScore,
+        smartCrop: analysis.smartCrop,
+      }
+
+      // If smartcrop found a better position, use it as subjectCenter
+      if (analysis.smartCrop) {
+        const smartPos = smartCropToObjectPosition(analysis.smartCrop)
+        if (smartPos !== '50% 50%' && regions.length === 0) {
+          const [xStr, yStr] = smartPos.split(' ')
+          const parsedX = parseInt(xStr) / 100
+          const parsedY = parseInt(yStr) / 100
+          if (!isNaN(parsedX) && !isNaN(parsedY)) {
+            subjectCenter = { x: parsedX, y: parsedY }
+          }
+        }
+      }
+    }
+  } catch {
+    // Enhanced analysis is optional — fall back to basic analysis
+  }
+
+  return { photoId, regions, subjectCenter, analyzedAt: Date.now(), ...enhancedFields }
 }
 
 export async function analyzePhotoWithCache(photoId: string, dataUrl: string): Promise<PhotoAnalysis> {
@@ -150,6 +203,11 @@ export async function analyzePhotoWithCache(photoId: string, dataUrl: string): P
 }
 
 export function calculateSmartPosition(analysis: PhotoAnalysis): string {
+  // Prefer smartcrop-based positioning when available
+  if (analysis.smartCrop) {
+    return smartCropToObjectPosition(analysis.smartCrop)
+  }
+
   const x = Math.round(analysis.subjectCenter.x * 100)
   const y = Math.round(analysis.subjectCenter.y * 100)
 
