@@ -1,7 +1,8 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals'
 
 // Mock colorthief before importing the module under test
-const mockGetPalette = jest.fn()
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockGetPalette = jest.fn<(...args: any[]) => Promise<any>>()
 jest.unstable_mockModule('colorthief', () => ({
   getPalette: mockGetPalette,
 }))
