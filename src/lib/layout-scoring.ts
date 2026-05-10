@@ -1,11 +1,16 @@
 import type { GridLayout } from './types'
 import type { PhotoOrientation } from './image-analysis'
+import type { DominantColor, PhotoColorProfile } from './color-intelligence'
+import { scoreColorHarmony } from './color-intelligence'
 
 export interface PhotoCharacteristics {
   photoId: string
   orientation: PhotoOrientation
   aspectRatio: number
   sharpnessScore: number
+  dominantColors?: DominantColor[]
+  isDark?: boolean
+  averageLuminance?: number
 }
 
 export interface LayoutScore {
@@ -169,6 +174,23 @@ export function scoreLayout(
       reasons.push('Aspect ratio alignment')
     } else if ((layoutAR > 1 && avgPhotoAR < 1) || (layoutAR < 1 && avgPhotoAR > 1)) {
       score -= 15
+    }
+  }
+
+  // 5. Color harmony bonus/penalty (Phase 2)
+  const colorProfiles: PhotoColorProfile[] = photos
+    .filter(p => p.dominantColors && p.dominantColors.length > 0)
+    .map(p => ({
+      photoId: p.photoId,
+      dominantColors: p.dominantColors!,
+      isDark: p.isDark ?? false,
+      averageLuminance: p.averageLuminance ?? 0.5,
+    }))
+  if (colorProfiles.length >= 2) {
+    const colorBonus = scoreColorHarmony(colorProfiles)
+    if (colorBonus !== 0) {
+      score += colorBonus
+      if (colorBonus > 0) reasons.push('Color harmony')
     }
   }
 

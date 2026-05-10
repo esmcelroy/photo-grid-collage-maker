@@ -1,5 +1,7 @@
 import type { PhotoOrientation } from './image-analysis'
 import { smartCropToObjectPosition, analyzeImage } from './image-analysis'
+import type { DominantColor } from './color-intelligence'
+import { analyzeColors } from './color-intelligence'
 
 export interface DetectedRegion {
   x: number      // 0-1 normalized
@@ -21,6 +23,10 @@ export interface PhotoAnalysis {
   sharpnessScore?: number
   smartCrop?: { x: number; y: number; width: number; height: number }
   exifOrientation?: number
+  // Color intelligence fields (Phase 2)
+  dominantColors?: DominantColor[]
+  isDark?: boolean
+  averageLuminance?: number
 }
 
 const analysisCache = new Map<string, PhotoAnalysis>()
@@ -171,6 +177,16 @@ export async function analyzePhoto(photoId: string, dataUrl: string): Promise<Ph
         orientation: analysis.orientation,
         sharpnessScore: analysis.sharpnessScore,
         smartCrop: analysis.smartCrop,
+      }
+
+      // Color analysis (Phase 2)
+      try {
+        const colorData = await analyzeColors(img)
+        enhancedFields.dominantColors = colorData.dominantColors
+        enhancedFields.isDark = colorData.isDark
+        enhancedFields.averageLuminance = colorData.averageLuminance
+      } catch {
+        // Color analysis is optional — fall back gracefully
       }
 
       // If smartcrop found a better position, use it as subjectCenter
