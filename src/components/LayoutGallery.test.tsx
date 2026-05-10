@@ -117,6 +117,51 @@ describe('LayoutGallery', () => {
     expect(onLayoutSelect).toHaveBeenCalledWith('2-horizontal')
   })
 
+  it('allows keyboard users to tab to layout cards', async () => {
+    const user = userEvent.setup()
+    render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId={null}
+        onLayoutSelect={jest.fn()}
+      />
+    )
+
+    let sideBySideCard: HTMLElement | null = null
+    for (let i = 0; i < 10; i += 1) {
+      await user.tab()
+      sideBySideCard = screen.getByRole('button', { name: 'Select Side by Side layout' })
+      if (sideBySideCard === document.activeElement) break
+    }
+
+    expect(sideBySideCard).toHaveFocus()
+  })
+
+  it('calls onLayoutSelect when a focused layout card is activated with keyboard', async () => {
+    const onLayoutSelect = jest.fn()
+    const user = userEvent.setup()
+    render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId={null}
+        onLayoutSelect={onLayoutSelect}
+      />
+    )
+
+    const sideBySideCard = screen.getByRole('button', { name: 'Select Side by Side layout' })
+    sideBySideCard.focus()
+    await user.keyboard('{Enter}')
+    await user.keyboard(' ')
+
+    expect(onLayoutSelect).toHaveBeenCalledTimes(2)
+    expect(onLayoutSelect).toHaveBeenNthCalledWith(1, '2-horizontal')
+    expect(onLayoutSelect).toHaveBeenNthCalledWith(2, '2-horizontal')
+  })
+
   // ─── branch-coverage additions ────────────────────────────────────────────
 
   it('shows singular "1 layout" text when only one layout is available', () => {

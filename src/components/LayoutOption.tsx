@@ -1,8 +1,6 @@
-import { KeyboardEvent } from 'react'
 import { GridLayout, PhotoPosition, UploadedPhoto } from '@/lib/types'
 import { getUniqueAreaNames } from '@/lib/layouts'
 import { cn } from '@/lib/utils'
-import { Card } from '@/components/ui/card'
 
 interface LayoutOptionProps {
   layout: GridLayout
@@ -19,12 +17,6 @@ export function LayoutOption({
   isSelected, 
   onSelect 
 }: LayoutOptionProps) {
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      onSelect()
-    }
-  }
   const getPhotoForArea = (area: string): UploadedPhoto | undefined => {
     const position = photoPositions.find(p => p.gridArea === area)
     if (!position) return undefined
@@ -36,7 +28,8 @@ export function LayoutOption({
   const { rows, columns } = parseTemplate(layout.gridTemplate)
 
   return (
-    <Card
+    <button
+      type="button"
       className={cn(
         "relative cursor-pointer transition-all duration-300 overflow-hidden group",
         "hover:shadow-lg hover:scale-[1.02]",
@@ -46,9 +39,6 @@ export function LayoutOption({
           : "hover:ring-2 hover:ring-accent/50"
       )}
       onClick={onSelect}
-      onKeyDown={handleKeyDown}
-      tabIndex={0}
-      role="button"
       aria-label={`Select ${layout.name} layout`}
       aria-pressed={isSelected}
     >
@@ -105,7 +95,7 @@ export function LayoutOption({
           <div className="w-2 h-2 bg-white rounded-full" />
         </div>
       )}
-    </Card>
+    </button>
   )
 }
 
