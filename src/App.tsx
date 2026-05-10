@@ -25,7 +25,7 @@ import { useCollageHistory, CollageSnapshot } from '@/hooks/use-collage-history'
 import { useDarkMode } from '@/hooks/use-dark-mode'
 import { useSmartPositioning } from '@/hooks/use-smart-position'
 import { analyzePhotoWithCache, calculateSmartPosition, getCachedAnalysis } from '@/lib/face-detection'
-import { rankLayouts } from '@/lib/layout-scoring'
+import { rankLayouts, suggestPhotoArrangement } from '@/lib/layout-scoring'
 import type { PhotoCharacteristics } from '@/lib/layout-scoring'
 import type { DominantColor } from '@/lib/color-intelligence'
 import { cn } from '@/lib/utils'
@@ -135,6 +135,16 @@ function App() {
     const ranked = rankLayouts(availableLayouts, characteristics)
     return ranked.map(r => availableLayouts.find(l => l.id === r.layoutId)!).filter(Boolean)
   }, [availableLayouts, photos])
+
+  // The top-ranked layout gets a "Recommended" badge (only when analysis data exists)
+  const recommendedLayoutId = useMemo(() => {
+    if (rankedLayouts.length === 0 || photos.length === 0) return null
+    const hasAnalysis = photos.some(p => {
+      const cached = getCachedAnalysis(p.id)
+      return cached && (cached.orientation !== undefined || cached.aspectRatio !== undefined)
+    })
+    return hasAnalysis ? rankedLayouts[0]?.id ?? null : null
+  }, [rankedLayouts, photos])
 
   // Aggregate dominant colors from all analyzed photos for background suggestions
   const allPhotoColors: DominantColor[] = useMemo(() => {
@@ -284,6 +294,34 @@ function App() {
     setShowCarousel(false)
     toast.success(`Applied ${layout.name} arrangement`)
   }, [availableLayouts, updateLayout, pushSnapshot, getCurrentSnapshot])
+
+  const handleAutoLayout = useCallback(async () => {
+    if (rankedLayouts.length === 0 || photos.length === 0) return
+    const bestLayout = rankedLayouts[0]
+    pushSnapshot(getCurrentSnapshot())
+
+    // Build characteristics for optimal photo arrangement
+    const characteristics: PhotoCharacteristics[] = photos.map(p => {
+      const cached = getCachedAnalysis(p.id)
+      return {
+        photoId: p.id,
+        orientation: cached?.orientation ?? 'square',
+        aspectRatio: cached?.aspectRatio ?? 1,
+        sharpnessScore: cached?.sharpnessScore ?? 0,
+      }
+    })
+
+    // Get optimal photo-to-slot assignment
+    const arrangement = suggestPhotoArrangement(bestLayout, characteristics)
+    const areaNames = getUniqueAreaNames(bestLayout.areas)
+    const positions: PhotoPosition[] = areaNames.map(area => ({
+      photoId: arrangement.get(area) ?? '',
+      gridArea: area,
+    }))
+
+    await updateLayout(bestLayout.id, positions)
+    toast.success(`Auto-applied ${bestLayout.name} with optimized arrangement`)
+  }, [rankedLayouts, photos, updateLayout, pushSnapshot, getCurrentSnapshot])
 
   const handleDownload = async (options: ExportOptions) => {
     if (!previewRef.current || !selectedLayout) {
@@ -637,6 +675,8 @@ function App() {
                     selectedLayoutId={selectedLayoutId}
                     onLayoutSelect={handleLayoutSelect}
                     onArrangementApply={handleArrangementApply}
+                    onAutoLayout={handleAutoLayout}
+                    recommendedLayoutId={recommendedLayoutId}
                     showCarousel={showCarousel}
                     onToggleCarousel={handleToggleCarousel}
                     compareIds={compareIds}

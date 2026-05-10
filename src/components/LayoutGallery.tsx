@@ -4,8 +4,7 @@ import { LayoutOption } from './LayoutOption'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { GridFour, Shuffle, Columns, MagicWand } from '@phosphor-icons/react'
-import { getUniqueAreaNames } from '@/lib/layouts'
+import { GridFour, Shuffle, Columns, MagicWand, Lightning } from '@phosphor-icons/react'
 
 const PLATFORM_FILTERS: { value: SocialPlatform | null; label: string }[] = [
   { value: null, label: 'All' },
@@ -23,6 +22,8 @@ interface LayoutGalleryProps {
   selectedLayoutId: string | null
   onLayoutSelect: (layoutId: string) => void
   onArrangementApply?: (layoutId: string, positions: PhotoPosition[]) => void
+  onAutoLayout?: () => void
+  recommendedLayoutId?: string | null
   showCarousel: boolean
   onToggleCarousel: () => void
   compareIds: string[]
@@ -36,6 +37,8 @@ export function LayoutGallery({
   selectedLayoutId,
   onLayoutSelect,
   onArrangementApply,
+  onAutoLayout,
+  recommendedLayoutId,
   showCarousel,
   onToggleCarousel,
   compareIds,
@@ -91,6 +94,17 @@ export function LayoutGallery({
         >
           <Shuffle className="w-4 h-4" weight="bold" />
         </Button>
+        {onAutoLayout && recommendedLayoutId && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onAutoLayout}
+            title="Auto-select best layout with optimized photo placement"
+            aria-label="Auto layout"
+          >
+            <Lightning className="w-4 h-4" weight="fill" />
+          </Button>
+        )}
         <Button
           variant={isComparing ? "default" : "ghost"}
           size="sm"
@@ -139,6 +153,7 @@ export function LayoutGallery({
                 photos={photos}
                 photoPositions={photoPositions}
                 isSelected={selectedLayoutId === layout.id}
+                isRecommended={recommendedLayoutId === layout.id}
                 onSelect={() => {
                   if (isComparing) {
                     onToggleCompare(layout.id)
