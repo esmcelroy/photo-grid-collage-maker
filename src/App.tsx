@@ -27,6 +27,7 @@ import { useSmartPositioning } from '@/hooks/use-smart-position'
 import { analyzePhotoWithCache, calculateSmartPosition, getCachedAnalysis } from '@/lib/face-detection'
 import { rankLayouts } from '@/lib/layout-scoring'
 import type { PhotoCharacteristics } from '@/lib/layout-scoring'
+import type { DominantColor } from '@/lib/color-intelligence'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -121,6 +122,9 @@ function App() {
         orientation: cached?.orientation ?? 'square',
         aspectRatio: cached?.aspectRatio ?? 1,
         sharpnessScore: cached?.sharpnessScore ?? 0,
+        dominantColors: cached?.dominantColors,
+        isDark: cached?.isDark,
+        averageLuminance: cached?.averageLuminance,
       }
     })
 
@@ -131,6 +135,19 @@ function App() {
     const ranked = rankLayouts(availableLayouts, characteristics)
     return ranked.map(r => availableLayouts.find(l => l.id === r.layoutId)!).filter(Boolean)
   }, [availableLayouts, photos])
+
+  // Aggregate dominant colors from all analyzed photos for background suggestions
+  const allPhotoColors: DominantColor[] = useMemo(() => {
+    if (photos.length === 0) return []
+    const colors: DominantColor[] = []
+    for (const p of photos) {
+      const cached = getCachedAnalysis(p.id)
+      if (cached?.dominantColors) {
+        colors.push(...cached.dominantColors)
+      }
+    }
+    return colors
+  }, [photos])
 
   const handleToggleCarousel = useCallback(() => {
     setShowCarousel(prev => {
@@ -608,6 +625,7 @@ function App() {
                   <CustomizationControls
                     settings={settings}
                     onSettingsChange={handleSettingsChange}
+                    photoColors={allPhotoColors}
                   />
                 </CollapsibleSection>
 

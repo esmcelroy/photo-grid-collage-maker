@@ -1,14 +1,17 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { CollageSettings } from '@/lib/types'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Palette } from '@phosphor-icons/react'
+import { Palette, Sparkle } from '@phosphor-icons/react'
+import type { DominantColor, SuggestedColor } from '@/lib/color-intelligence'
+import { suggestBackgroundColors, averageLuminanceFromColors } from '@/lib/color-intelligence'
 
 interface CustomizationControlsProps {
   settings: CollageSettings
   onSettingsChange: (settings: CollageSettings) => void
+  photoColors?: DominantColor[]
 }
 
 const PRESET_COLORS = [
@@ -26,10 +29,17 @@ const PRESET_COLORS = [
 
 export function CustomizationControls({
   settings,
-  onSettingsChange
+  onSettingsChange,
+  photoColors,
 }: CustomizationControlsProps) {
   const gapSliderRef = useRef<HTMLDivElement>(null)
   const radiusSliderRef = useRef<HTMLDivElement>(null)
+
+  const suggestedColors: SuggestedColor[] = useMemo(() => {
+    if (!photoColors || photoColors.length === 0) return []
+    const avgLum = averageLuminanceFromColors(photoColors)
+    return suggestBackgroundColors(photoColors, avgLum)
+  }, [photoColors])
 
   // Radix Slider doesn't forward aria-label to Thumb, so inject it post-render
   useEffect(() => {
@@ -90,6 +100,38 @@ export function CustomizationControls({
           <Label className="text-sm font-medium mb-3 block">
             Background Color
           </Label>
+          {suggestedColors.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Sparkle className="w-3.5 h-3.5 text-purple-500" weight="duotone" />
+                <span className="text-xs font-medium text-muted-foreground">Suggested for your photos</span>
+              </div>
+              <div className="grid grid-cols-5 gap-2">
+                {suggestedColors.map((color) => (
+                  <button
+                    key={color.hex}
+                    onClick={() =>
+                      onSettingsChange({ ...settings, backgroundColor: color.hex })
+                    }
+                    className="group relative aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105"
+                    style={{
+                      backgroundColor: color.hex,
+                      borderColor: settings.backgroundColor === color.hex
+                        ? '#7c3aed'
+                        : '#d4d0dc'
+                    }}
+                    title={`${color.name}: ${color.reason}`}
+                  >
+                    {settings.backgroundColor === color.hex && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-2 h-2 bg-accent rounded-full" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-5 gap-2">
             {PRESET_COLORS.map((color) => (
               <button
