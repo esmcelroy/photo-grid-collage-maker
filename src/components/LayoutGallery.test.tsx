@@ -129,14 +129,19 @@ describe('LayoutGallery', () => {
       />
     )
 
-    let sideBySideCard: HTMLElement | null = null
-    for (let i = 0; i < 10; i += 1) {
+    const sideBySideButton = screen.getByRole('button', { name: 'Select Side by Side layout' })
+    const focusableButtons = screen.getAllByRole('button')
+    let reachedLayoutButton = false
+    for (let tabPressCount = 0; tabPressCount < focusableButtons.length; tabPressCount += 1) {
       await user.tab()
-      sideBySideCard = screen.getByRole('button', { name: 'Select Side by Side layout' })
-      if (sideBySideCard === document.activeElement) break
+      if (sideBySideButton === document.activeElement) {
+        reachedLayoutButton = true
+        break
+      }
     }
 
-    expect(sideBySideCard).toHaveFocus()
+    expect(reachedLayoutButton).toBe(true)
+    expect(sideBySideButton).toHaveFocus()
   })
 
   it('calls onLayoutSelect when a focused layout card is activated with keyboard', async () => {

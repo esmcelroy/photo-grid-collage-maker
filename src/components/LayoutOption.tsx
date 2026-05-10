@@ -31,7 +31,7 @@ export function LayoutOption({
     <button
       type="button"
       className={cn(
-        "relative cursor-pointer transition-all duration-300 overflow-hidden group",
+        "relative transition-all duration-300 overflow-hidden group",
         "hover:shadow-lg hover:scale-[1.02]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         isSelected 
