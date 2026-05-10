@@ -24,7 +24,9 @@ import { toast } from 'sonner'
 import { useCollageHistory, CollageSnapshot } from '@/hooks/use-collage-history'
 import { useDarkMode } from '@/hooks/use-dark-mode'
 import { useSmartPositioning } from '@/hooks/use-smart-position'
-import { analyzePhotoWithCache, calculateSmartPosition } from '@/lib/face-detection'
+import { analyzePhotoWithCache, calculateSmartPosition, getCachedAnalysis } from '@/lib/face-detection'
+import { rankLayouts } from '@/lib/layout-scoring'
+import type { PhotoCharacteristics } from '@/lib/layout-scoring'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -107,6 +109,28 @@ function App() {
     () => compareIds.map(id => availableLayouts.find(l => l.id === id)).filter(Boolean) as GridLayout[],
     [compareIds, availableLayouts]
   )
+
+  // Rank available layouts based on photo characteristics when analysis data is cached
+  const rankedLayouts = useMemo(() => {
+    if (availableLayouts.length === 0 || photos.length === 0) return availableLayouts
+
+    const characteristics: PhotoCharacteristics[] = photos.map(p => {
+      const cached = getCachedAnalysis(p.id)
+      return {
+        photoId: p.id,
+        orientation: cached?.orientation ?? 'square',
+        aspectRatio: cached?.aspectRatio ?? 1,
+        sharpnessScore: cached?.sharpnessScore ?? 0,
+      }
+    })
+
+    // Only rank if we have real analysis data (at least one non-default)
+    const hasAnalysis = characteristics.some(c => c.orientation !== 'square' || c.aspectRatio !== 1)
+    if (!hasAnalysis) return availableLayouts
+
+    const ranked = rankLayouts(availableLayouts, characteristics)
+    return ranked.map(r => availableLayouts.find(l => l.id === r.layoutId)!).filter(Boolean)
+  }, [availableLayouts, photos])
 
   const handleToggleCarousel = useCallback(() => {
     setShowCarousel(prev => {
@@ -589,7 +613,7 @@ function App() {
 
                 <CollapsibleSection title="Layout Options" defaultOpen={true}>
                   <LayoutGallery
-                    layouts={availableLayouts}
+                    layouts={rankedLayouts}
                     photos={photos}
                     photoPositions={photoPositions}
                     selectedLayoutId={selectedLayoutId}
