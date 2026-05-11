@@ -103,5 +103,74 @@ describe('ml-worker-client', () => {
       expect(mockTerminate).toHaveBeenCalled()
       expect(getWorkerStatus()).toBe('idle')
     })
+
+    it('is safe to call when no worker exists', () => {
+      expect(() => disposeMLWorker()).not.toThrow()
+      expect(getWorkerStatus()).toBe('idle')
+    })
+  })
+
+  describe('worker message handling', () => {
+    it('sets status to loading when worker reports loading', async () => {
+      const promise = initMLWorker()
+      await new Promise(r => setTimeout(r, 10))
+
+      // Simulate loading then ready
+      if (mockOnMessage) {
+        mockOnMessage(new MessageEvent('message', { data: { type: 'loading' } }))
+        expect(getWorkerStatus()).toBe('loading')
+        mockOnMessage(new MessageEvent('message', { data: { type: 'ready' } }))
+      }
+      await promise
+      expect(getWorkerStatus()).toBe('ready')
+    })
+
+    it('sets status to error on init-error', async () => {
+      const promise = initMLWorker()
+      await new Promise(r => setTimeout(r, 10))
+
+      if (mockOnMessage) {
+        mockOnMessage(new MessageEvent('message', {
+          data: { type: 'init-error', message: 'WASM load failed' },
+        }))
+      }
+      await expect(promise).rejects.toThrow()
+      expect(getWorkerStatus()).toBe('error')
+    })
+
+    it('skips init when already ready', async () => {
+      // First init
+      const p1 = initMLWorker()
+      await new Promise(r => setTimeout(r, 10))
+      if (mockOnMessage) {
+        mockOnMessage(new MessageEvent('message', { data: { type: 'ready' } }))
+      }
+      await p1
+
+      // Second init should return immediately
+      mockPostMessage.mockClear()
+      await initMLWorker()
+      expect(mockPostMessage).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('onWorkerStatusChange', () => {
+    it('notifies listeners of status changes', async () => {
+      const { onWorkerStatusChange } = await import('@/lib/ml-worker-client')
+      const statuses: string[] = []
+      const unsub = onWorkerStatusChange(s => statuses.push(s))
+
+      const promise = initMLWorker()
+      await new Promise(r => setTimeout(r, 10))
+      if (mockOnMessage) {
+        mockOnMessage(new MessageEvent('message', { data: { type: 'loading' } }))
+        mockOnMessage(new MessageEvent('message', { data: { type: 'ready' } }))
+      }
+      await promise
+
+      expect(statuses).toContain('loading')
+      expect(statuses).toContain('ready')
+      unsub()
+    })
   })
 })
