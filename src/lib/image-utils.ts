@@ -7,6 +7,83 @@ export async function fileToDataUrl(file: File): Promise<string> {
   })
 }
 
+/**
+ * EXIF orientation transform matrix for canvas operations.
+ * Maps EXIF orientation values (1-8) to the required canvas transforms.
+ * See: https://sirv.com/help/articles/rotate-photos-to-be-upright/
+ */
+const EXIF_TRANSFORMS: Record<number, {
+  swapDimensions: boolean
+  transform: (ctx: CanvasRenderingContext2D, w: number, h: number) => void
+}> = {
+  2: { swapDimensions: false, transform: (ctx, w) => { ctx.translate(w, 0); ctx.scale(-1, 1) } },
+  3: { swapDimensions: false, transform: (ctx, w, h) => { ctx.translate(w, h); ctx.rotate(Math.PI) } },
+  4: { swapDimensions: false, transform: (ctx, _w, h) => { ctx.translate(0, h); ctx.scale(1, -1) } },
+  5: { swapDimensions: true, transform: (ctx) => { ctx.rotate(Math.PI / 2); ctx.scale(1, -1) } },
+  6: { swapDimensions: true, transform: (ctx, _w, h) => { ctx.translate(h, 0); ctx.rotate(Math.PI / 2) } },
+  7: { swapDimensions: true, transform: (ctx, w, h) => { ctx.translate(h, w); ctx.rotate(-Math.PI / 2); ctx.scale(1, -1) } },
+  8: { swapDimensions: true, transform: (ctx, w) => { ctx.translate(0, w); ctx.rotate(-Math.PI / 2) } },
+}
+
+/**
+ * Reads EXIF orientation from a File and re-encodes through canvas
+ * with the correct rotation/flip applied. Returns a corrected data URL.
+ * Falls back to standard fileToDataUrl if EXIF is unavailable or orientation is normal.
+ */
+export async function correctExifOrientation(file: File): Promise<{ dataUrl: string; exifOrientation: number }> {
+  let orientation = 1
+  try {
+    const exifr = await import('exifr')
+    const data = await exifr.parse(file, ['Orientation'])
+    if (data?.Orientation && data.Orientation >= 2 && data.Orientation <= 8) {
+      orientation = data.Orientation
+    }
+  } catch {
+    // EXIF read failed — treat as orientation 1
+  }
+
+  // No correction needed for orientation 1 (identity)
+  if (orientation === 1) {
+    const dataUrl = await fileToDataUrl(file)
+    return { dataUrl, exifOrientation: 1 }
+  }
+
+  // Load image from file
+  const dataUrl = await fileToDataUrl(file)
+  const img = new Image()
+  img.src = dataUrl
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error('Failed to load image for EXIF correction'))
+    setTimeout(() => reject(new Error('Image load timeout')), 15000)
+  })
+
+  const { naturalWidth: w, naturalHeight: h } = img
+  const transform = EXIF_TRANSFORMS[orientation]
+  if (!transform) {
+    return { dataUrl, exifOrientation: orientation }
+  }
+
+  const canvas = document.createElement('canvas')
+  if (transform.swapDimensions) {
+    canvas.width = h
+    canvas.height = w
+  } else {
+    canvas.width = w
+    canvas.height = h
+  }
+
+  const ctx = canvas.getContext('2d')!
+  transform.transform(ctx, w, h)
+  ctx.drawImage(img, 0, 0)
+
+  const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg'
+  const quality = mimeType === 'image/jpeg' ? 0.92 : undefined
+  const correctedDataUrl = canvas.toDataURL(mimeType, quality)
+
+  return { dataUrl: correctedDataUrl, exifOrientation: orientation }
+}
+
 export function generateUniqueId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }

@@ -1,12 +1,14 @@
 import { GridLayout, PhotoPosition, UploadedPhoto } from '@/lib/types'
 import { getUniqueAreaNames } from '@/lib/layouts'
 import { cn } from '@/lib/utils'
+import { Star } from '@phosphor-icons/react'
 
 interface LayoutOptionProps {
   layout: GridLayout
   photos: UploadedPhoto[]
   photoPositions: PhotoPosition[]
   isSelected: boolean
+  isRecommended?: boolean
   onSelect: () => void
 }
 
@@ -15,6 +17,7 @@ export function LayoutOption({
   photos, 
   photoPositions,
   isSelected, 
+  isRecommended = false,
   onSelect 
 }: LayoutOptionProps) {
   const getPhotoForArea = (area: string): UploadedPhoto | undefined => {
@@ -93,6 +96,14 @@ export function LayoutOption({
       {isSelected && (
         <div className="absolute top-2 right-2 w-5 h-5 bg-accent rounded-full flex items-center justify-center">
           <div className="w-2 h-2 bg-white rounded-full" />
+        </div>
+      )}
+      {isRecommended && !isSelected && (
+        <div 
+          className="absolute top-2 right-2 w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center"
+          title="Best match for your photos"
+        >
+          <Star className="w-3 h-3 text-white" weight="fill" />
         </div>
       )}
     </button>

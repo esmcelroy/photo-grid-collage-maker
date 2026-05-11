@@ -379,6 +379,103 @@ describe('LayoutGallery', () => {
     expect(screen.getByTitle('Exit comparison')).toBeInTheDocument()
   })
 
+  // ─── auto-layout button ─────────────────────────────────────────────────
+
+  it('renders auto-layout button when onAutoLayout and recommendedLayoutId are provided', () => {
+    render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId={null}
+        onLayoutSelect={jest.fn()}
+        onAutoLayout={jest.fn()}
+        recommendedLayoutId="2-horizontal"
+      />
+    )
+    expect(screen.getByTitle('Auto-select best layout with optimized photo placement')).toBeInTheDocument()
+  })
+
+  it('does not render auto-layout button when recommendedLayoutId is null', () => {
+    render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId={null}
+        onLayoutSelect={jest.fn()}
+        onAutoLayout={jest.fn()}
+        recommendedLayoutId={null}
+      />
+    )
+    expect(screen.queryByTitle('Auto-select best layout with optimized photo placement')).not.toBeInTheDocument()
+  })
+
+  it('does not render auto-layout button when onAutoLayout is not provided', () => {
+    render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId={null}
+        onLayoutSelect={jest.fn()}
+        recommendedLayoutId="2-horizontal"
+      />
+    )
+    expect(screen.queryByTitle('Auto-select best layout with optimized photo placement')).not.toBeInTheDocument()
+  })
+
+  it('calls onAutoLayout when auto-layout button is clicked', async () => {
+    const onAutoLayout = jest.fn()
+    const user = userEvent.setup()
+    render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId={null}
+        onLayoutSelect={jest.fn()}
+        onAutoLayout={onAutoLayout}
+        recommendedLayoutId="2-horizontal"
+      />
+    )
+
+    await user.click(screen.getByTitle('Auto-select best layout with optimized photo placement'))
+    expect(onAutoLayout).toHaveBeenCalledTimes(1)
+  })
+
+  // ─── recommended badge ────────────────────────────────────────────────────
+
+  it('shows recommended badge on the recommended layout', () => {
+    render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId={null}
+        onLayoutSelect={jest.fn()}
+        recommendedLayoutId="2-horizontal"
+      />
+    )
+    const badge = screen.getByTitle('Best match for your photos')
+    expect(badge).toBeInTheDocument()
+  })
+
+  it('does not show recommended badge when the recommended layout is also selected', () => {
+    render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId="2-horizontal"
+        onLayoutSelect={jest.fn()}
+        recommendedLayoutId="2-horizontal"
+      />
+    )
+    // When selected, the selected badge takes precedence — no recommended badge
+    expect(screen.queryByTitle('Best match for your photos')).not.toBeInTheDocument()
+  })
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <LayoutGallery {...defaultPanelProps}
@@ -387,6 +484,22 @@ describe('LayoutGallery', () => {
         photoPositions={[]}
         selectedLayoutId="2-horizontal"
         onLayoutSelect={jest.fn()}
+      />
+    )
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+
+  it('has no accessibility violations with auto-layout and recommended badge', async () => {
+    const { container } = render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId={null}
+        onLayoutSelect={jest.fn()}
+        onAutoLayout={jest.fn()}
+        recommendedLayoutId="2-horizontal"
       />
     )
     const results = await axe(container)

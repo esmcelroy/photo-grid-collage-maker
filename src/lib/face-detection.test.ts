@@ -5,6 +5,7 @@ import {
   analyzePhotoWithCache,
   clearAnalysisCache,
   getCachedAnalysis,
+  setAnalysisDetectionMode,
 } from './face-detection'
 import type { PhotoAnalysis } from './face-detection'
 
@@ -152,6 +153,29 @@ describe('clearAnalysisCache', () => {
 
     clearAnalysisCache()
     expect(getCachedAnalysis('photo-x')).toBeUndefined()
+  })
+})
+
+describe('setAnalysisDetectionMode', () => {
+  it('basic mode skips face detection entirely', async () => {
+    setAnalysisDetectionMode('basic')
+    mockImageLoad(100, 100)
+    mockGetImageData.mockReturnValue(createMockImageData(100, 100) as unknown as ImageData)
+
+    const result = await analyzePhoto('basic-test', 'data:image/png;base64,abc')
+    // In basic mode, only salient regions (Sobel edges) are detected — no face detection
+    expect(result.regions.every(r => r.type === 'salient-region')).toBe(true)
+  })
+
+  it('standard mode attempts face detection', async () => {
+    setAnalysisDetectionMode('standard')
+    mockImageLoad(100, 100)
+    mockGetImageData.mockReturnValue(createMockImageData(100, 100) as unknown as ImageData)
+
+    // No native FaceDetector and no ML worker, so faces will be empty
+    const result = await analyzePhoto('standard-test', 'data:image/png;base64,abc')
+    expect(result.photoId).toBe('standard-test')
+    expect(result.subjectCenter).toBeDefined()
   })
 })
 

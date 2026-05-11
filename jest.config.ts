@@ -34,7 +34,10 @@ const config: Config = {
     '!src/App.tsx',          // Integration component — covered by Playwright E2E tests
     '!src/ErrorFallback.tsx', // Uses import.meta.env (Vite-only API); not testable in Jest
     '!src/lib/db.ts',        // Dexie/IndexedDB layer — covered by Playwright E2E tests
+    '!src/lib/ml-worker-client.ts', // Web Worker integration — tested via E2E
+    '!src/lib/face-detection.ts', // ML worker integration — import.meta.url breaks Jest; covered by E2E
     '!src/lib/heic-utils.ts', // WASM-dependent — canvas/libheif mocked in tests
+    '!src/workers/**',        // Web Workers use WASM/OffscreenCanvas — not testable in jsdom
     '!src/components/ui/**',
     '!src/vite-end.d.ts',
     '!src/index.css',

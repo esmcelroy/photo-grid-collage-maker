@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useCollageApi } from '@/hooks/useCollageApi'
 import { UploadedPhoto, PhotoPosition, GridLayout, CollageSettings, ExportOptions, MAX_PHOTOS } from '@/lib/types'
 import { getLayoutsForPhotoCount, getUniqueAreaNames } from '@/lib/layouts'
-import { fileToDataUrl, generateUniqueId, downloadCollage } from '@/lib/image-utils'
+import { correctExifOrientation, generateUniqueId, downloadCollage } from '@/lib/image-utils'
 import { processFilesForHeic } from '@/lib/heic-utils'
 import { UploadZone } from '@/components/UploadZone'
 import { PhotoThumbnail } from '@/components/PhotoThumbnail'
@@ -24,9 +24,12 @@ import { toast } from 'sonner'
 import { useCollageHistory, CollageSnapshot } from '@/hooks/use-collage-history'
 import { useDarkMode } from '@/hooks/use-dark-mode'
 import { useSmartPositioning } from '@/hooks/use-smart-position'
-import { analyzePhotoWithCache, calculateSmartPosition, getCachedAnalysis } from '@/lib/face-detection'
-import { rankLayouts } from '@/lib/layout-scoring'
+import { analyzePhotoWithCache, calculateSmartPosition, getCachedAnalysis, clearAnalysisCache, setAnalysisDetectionMode } from '@/lib/face-detection'
+import { rankLayouts, suggestPhotoArrangement } from '@/lib/layout-scoring'
 import type { PhotoCharacteristics } from '@/lib/layout-scoring'
+import type { DominantColor } from '@/lib/color-intelligence'
+import { initMLWorker, disposeMLWorker, getWorkerStatus, onWorkerStatusChange, hasNativeFaceDetector } from '@/lib/ml-worker-client'
+import type { WorkerStatus } from '@/lib/ml-worker-client'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -80,7 +83,7 @@ function App() {
 
   const { canUndo, canRedo, pushSnapshot, undo, redo, setRestoring, clear: clearHistory } = useCollageHistory()
   const { theme, setTheme, isDark } = useDarkMode()
-  const { enabled: smartPositionEnabled, setEnabled: setSmartPositionEnabled } = useSmartPositioning()
+  const { enabled: smartPositionEnabled, setEnabled: setSmartPositionEnabled, detectionMode, setDetectionMode } = useSmartPositioning()
 
   const cycleTheme = useCallback(() => {
     const next = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'
@@ -103,7 +106,49 @@ function App() {
   const [selectedLayout, setSelectedLayout] = useState<GridLayout | null>(null)
   const [showCarousel, setShowCarousel] = useState(false)
   const [compareIds, setCompareIds] = useState<string[]>([])
+  const [analysisVersion, setAnalysisVersion] = useState(0)
+  const [workerStatus, setWorkerStatus] = useState<WorkerStatus>(getWorkerStatus)
   const isComparing = compareIds.length > 0
+
+  // Track ML worker status changes
+  useEffect(() => {
+    return onWorkerStatusChange(setWorkerStatus)
+  }, [])
+
+  // Initialize or dispose ML worker based on detection mode
+  useEffect(() => {
+    if (!smartPositionEnabled || detectionMode === 'basic') {
+      // Dispose worker when not needed
+      if (workerStatus !== 'idle') disposeMLWorker()
+      return
+    }
+
+    // On Chrome/Edge with standard mode, native FaceDetector handles faces — no worker needed
+    if (detectionMode === 'standard' && hasNativeFaceDetector()) return
+
+    // Initialize worker with appropriate model
+    const model = detectionMode === 'advanced' ? 'both' : 'face'
+    let cancelled = false
+    initMLWorker(model).catch(() => {
+      if (!cancelled) {
+        const fallback = detectionMode === 'advanced' ? 'standard' : 'basic'
+        toast.error(`Detection model failed to load. Using ${fallback} mode.`)
+        setDetectionMode(fallback)
+      }
+    })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [smartPositionEnabled, detectionMode])
+
+  // When detection mode changes, clear analysis cache so photos get re-analyzed
+  const prevDetectionMode = useRef(detectionMode)
+  useEffect(() => {
+    if (prevDetectionMode.current !== detectionMode) {
+      prevDetectionMode.current = detectionMode
+      clearAnalysisCache()
+      setAnalysisVersion(v => v + 1)
+    }
+  }, [detectionMode])
 
   const compareLayouts = useMemo(
     () => compareIds.map(id => availableLayouts.find(l => l.id === id)).filter(Boolean) as GridLayout[],
@@ -121,6 +166,9 @@ function App() {
         orientation: cached?.orientation ?? 'square',
         aspectRatio: cached?.aspectRatio ?? 1,
         sharpnessScore: cached?.sharpnessScore ?? 0,
+        dominantColors: cached?.dominantColors,
+        isDark: cached?.isDark,
+        averageLuminance: cached?.averageLuminance,
       }
     })
 
@@ -130,7 +178,33 @@ function App() {
 
     const ranked = rankLayouts(availableLayouts, characteristics)
     return ranked.map(r => availableLayouts.find(l => l.id === r.layoutId)!).filter(Boolean)
-  }, [availableLayouts, photos])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableLayouts, photos, analysisVersion])
+
+  // The top-ranked layout gets a "Recommended" badge (only when analysis data exists)
+  const recommendedLayoutId = useMemo(() => {
+    if (rankedLayouts.length === 0 || photos.length === 0) return null
+    const hasAnalysis = photos.some(p => {
+      const cached = getCachedAnalysis(p.id)
+      return cached && (cached.orientation !== undefined || cached.aspectRatio !== undefined)
+    })
+    return hasAnalysis ? rankedLayouts[0]?.id ?? null : null
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rankedLayouts, photos, analysisVersion])
+
+  // Aggregate dominant colors from all analyzed photos for background suggestions
+  const allPhotoColors: DominantColor[] = useMemo(() => {
+    if (photos.length === 0) return []
+    const colors: DominantColor[] = []
+    for (const p of photos) {
+      const cached = getCachedAnalysis(p.id)
+      if (cached?.dominantColors) {
+        colors.push(...cached.dominantColors)
+      }
+    }
+    return colors
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photos, analysisVersion])
 
   const handleToggleCarousel = useCallback(() => {
     setShowCarousel(prev => {
@@ -218,7 +292,7 @@ function App() {
 
       await Promise.all(
         converted.map(async (file) => {
-          const dataUrl = await fileToDataUrl(file)
+          const { dataUrl } = await correctExifOrientation(file)
           const id = generateUniqueId()
           await addPhoto({ id, dataUrl, fileName: file.name })
         })
@@ -267,6 +341,34 @@ function App() {
     setShowCarousel(false)
     toast.success(`Applied ${layout.name} arrangement`)
   }, [availableLayouts, updateLayout, pushSnapshot, getCurrentSnapshot])
+
+  const handleAutoLayout = useCallback(async () => {
+    if (rankedLayouts.length === 0 || photos.length === 0) return
+    const bestLayout = rankedLayouts[0]
+    pushSnapshot(getCurrentSnapshot())
+
+    // Build characteristics for optimal photo arrangement
+    const characteristics: PhotoCharacteristics[] = photos.map(p => {
+      const cached = getCachedAnalysis(p.id)
+      return {
+        photoId: p.id,
+        orientation: cached?.orientation ?? 'square',
+        aspectRatio: cached?.aspectRatio ?? 1,
+        sharpnessScore: cached?.sharpnessScore ?? 0,
+      }
+    })
+
+    // Get optimal photo-to-slot assignment
+    const arrangement = suggestPhotoArrangement(bestLayout, characteristics)
+    const areaNames = getUniqueAreaNames(bestLayout.areas)
+    const positions: PhotoPosition[] = areaNames.map(area => ({
+      photoId: arrangement.get(area) ?? '',
+      gridArea: area,
+    }))
+
+    await updateLayout(bestLayout.id, positions)
+    toast.success(`Auto-applied ${bestLayout.name} with optimized arrangement`)
+  }, [rankedLayouts, photos, updateLayout, pushSnapshot, getCurrentSnapshot])
 
   const handleDownload = async (options: ExportOptions) => {
     if (!previewRef.current || !selectedLayout) {
@@ -359,12 +461,19 @@ function App() {
   useEffect(() => {
     if (!smartPositionEnabled || !selectedLayout || photos.length === 0) return
 
+    // Sync detection mode to analysis pipeline before running
+    setAnalysisDetectionMode(detectionMode)
+
     let cancelled = false
     async function applySmartPositions() {
-      const analyses = await Promise.all(
+      const results = await Promise.allSettled(
         photos.map(p => analyzePhotoWithCache(p.id, p.dataUrl))
       )
       if (cancelled) return
+
+      const analyses = results
+        .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof analyzePhotoWithCache>>> => r.status === 'fulfilled')
+        .map(r => r.value)
 
       const updatedPositions = photoPositions.map(pos => {
         const analysis = analyses.find(a => a.photoId === pos.photoId)
@@ -380,12 +489,14 @@ function App() {
       if (changed && !cancelled) {
         void updatePositions(updatedPositions).catch(() => {})
       }
+      // Bump analysis version so ranking/color memos re-evaluate
+      if (!cancelled) setAnalysisVersion(v => v + 1)
     }
 
     applySmartPositions()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [smartPositionEnabled, selectedLayoutId, photos.length])
+  }, [smartPositionEnabled, selectedLayoutId, photos.length, detectionMode, analysisVersion])
 
   // Derived state for edit dialog
   const editingPosition = editingArea
@@ -608,6 +719,11 @@ function App() {
                   <CustomizationControls
                     settings={settings}
                     onSettingsChange={handleSettingsChange}
+                    photoColors={allPhotoColors}
+                    smartPositionEnabled={smartPositionEnabled}
+                    detectionMode={detectionMode}
+                    onDetectionModeChange={setDetectionMode}
+                    workerStatus={workerStatus}
                   />
                 </CollapsibleSection>
 
@@ -619,6 +735,8 @@ function App() {
                     selectedLayoutId={selectedLayoutId}
                     onLayoutSelect={handleLayoutSelect}
                     onArrangementApply={handleArrangementApply}
+                    onAutoLayout={handleAutoLayout}
+                    recommendedLayoutId={recommendedLayoutId}
                     showCarousel={showCarousel}
                     onToggleCarousel={handleToggleCarousel}
                     compareIds={compareIds}

@@ -1,5 +1,10 @@
 import type { PhotoOrientation } from './image-analysis'
 import { smartCropToObjectPosition, analyzeImage } from './image-analysis'
+import type { DominantColor } from './color-intelligence'
+import { analyzeColors } from './color-intelligence'
+import { detectFacesML, detectCombined, hasNativeFaceDetector, getWorkerStatus, getWorkerModel } from './ml-worker-client'
+import { mergeDetections, computeWeightedCentroid, computeEnclosingBbox } from './region-merge'
+import type { DetectionMode } from '@/hooks/use-smart-position'
 
 export interface DetectedRegion {
   x: number      // 0-1 normalized
@@ -21,6 +26,10 @@ export interface PhotoAnalysis {
   sharpnessScore?: number
   smartCrop?: { x: number; y: number; width: number; height: number }
   exifOrientation?: number
+  // Color intelligence fields (Phase 2)
+  dominantColors?: DominantColor[]
+  isDark?: boolean
+  averageLuminance?: number
 }
 
 const analysisCache = new Map<string, PhotoAnalysis>()
@@ -34,11 +43,16 @@ export function clearAnalysisCache() {
 }
 
 async function detectSalientRegion(dataUrl: string): Promise<DetectedRegion[]> {
-  const img = new Image()
-  img.src = dataUrl
-  await new Promise(resolve => { img.onload = resolve })
+  try {
+    const img = new Image()
+    img.src = dataUrl
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = () => reject(new Error('Image failed to load'))
+      setTimeout(() => reject(new Error('Image load timeout')), 15000)
+    })
 
-  const canvas = document.createElement('canvas')
+    const canvas = document.createElement('canvas')
   // Use smaller size for performance (max 200px)
   const scale = Math.min(200 / img.width, 200 / img.height, 1)
   canvas.width = Math.round(img.width * scale)
@@ -95,24 +109,31 @@ async function detectSalientRegion(dataUrl: string): Promise<DetectedRegion[]> {
 
   if (sumWeight === 0) return []
 
-  return [{
-    x: minX / w,
-    y: minY / h,
-    width: (maxX - minX) / w,
-    height: (maxY - minY) / h,
-    type: 'salient-region',
-    confidence: 0.7,
-  }]
+    return [{
+      x: minX / w,
+      y: minY / h,
+      width: (maxX - minX) / w,
+      height: (maxY - minY) / h,
+      type: 'salient-region',
+      confidence: 0.7,
+    }]
+  } catch {
+    return []
+  }
 }
 
-async function detectFaces(dataUrl: string): Promise<DetectedRegion[]> {
+async function detectFacesNative(dataUrl: string): Promise<DetectedRegion[]> {
   if (typeof FaceDetector === 'undefined') return []
 
   try {
     const detector = new FaceDetector({ maxDetectedFaces: 10 })
     const img = new Image()
     img.src = dataUrl
-    await new Promise(resolve => { img.onload = resolve })
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = () => reject(new Error('Image failed to load'))
+      setTimeout(() => reject(new Error('Image load timeout')), 15000)
+    })
 
     const faces = await detector.detect(img)
     return faces.map(face => ({
@@ -128,9 +149,88 @@ async function detectFaces(dataUrl: string): Promise<DetectedRegion[]> {
   }
 }
 
+// Route face detection based on detection mode:
+// - basic: skip face detection entirely
+// - standard: use native FaceDetector on Chrome, ML worker on Safari/Firefox
+// - advanced: use ML worker with combined face + object detection
+async function detectFaces(dataUrl: string, mode: DetectionMode, photoId?: string): Promise<DetectedRegion[]> {
+  if (mode === 'basic') return []
+
+  // Advanced mode: combined face + object detection
+  if (mode === 'advanced') {
+    if (getWorkerStatus() === 'ready' && (getWorkerModel() === 'both' || getWorkerModel() === 'object')) {
+      try {
+        const combined = await detectCombined(photoId ?? 'unknown', dataUrl)
+        const merged = mergeDetections(combined.faces, combined.objects)
+
+        if (merged.length === 0) return []
+
+        // Convert weighted regions to DetectedRegion[] for the existing pipeline
+        const centroid = computeWeightedCentroid(merged)
+        const bbox = computeEnclosingBbox(merged)
+
+        if (bbox) {
+          return [{
+            x: bbox.x,
+            y: bbox.y,
+            width: bbox.width,
+            height: bbox.height,
+            type: 'salient-region',
+            confidence: Math.max(...merged.map(r => r.confidence * r.weight)),
+          }]
+        }
+
+        // Fallback: use centroid as a point region
+        return [{
+          x: centroid.x - 0.1,
+          y: centroid.y - 0.1,
+          width: 0.2,
+          height: 0.2,
+          type: 'salient-region',
+          confidence: 0.8,
+        }]
+      } catch {
+        // Fall through to standard face detection
+      }
+    }
+    // Fallback: try standard face detection if advanced fails
+  }
+
+  // Standard mode: prefer native API, fall back to ML worker
+  if (hasNativeFaceDetector()) {
+    return detectFacesNative(dataUrl)
+  }
+
+  // Use ML worker if available
+  if (getWorkerStatus() === 'ready') {
+    try {
+      const faces = await detectFacesML(photoId ?? 'unknown', dataUrl)
+      return faces.map(f => ({
+        x: f.x,
+        y: f.y,
+        width: f.width,
+        height: f.height,
+        type: 'face' as const,
+        confidence: f.confidence,
+      }))
+    } catch {
+      return []
+    }
+  }
+
+  return []
+}
+
+// Module-level detection mode — set before calling analyzePhoto
+let currentDetectionMode: DetectionMode = 'basic'
+
+export function setAnalysisDetectionMode(mode: DetectionMode): void {
+  currentDetectionMode = mode
+}
+
 export async function analyzePhoto(photoId: string, dataUrl: string): Promise<PhotoAnalysis> {
   const [faces, salient] = await Promise.all([
-    detectFaces(dataUrl),
+    detectFaces(dataUrl, currentDetectionMode, photoId),
     detectSalientRegion(dataUrl),
   ])
 
@@ -151,7 +251,11 @@ export async function analyzePhoto(photoId: string, dataUrl: string): Promise<Ph
   try {
     const img = new Image()
     img.src = dataUrl
-    await new Promise(resolve => { img.onload = resolve })
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = () => reject(new Error('Image failed to load'))
+      setTimeout(() => reject(new Error('Image load timeout')), 15000)
+    })
 
     const w = img.naturalWidth || img.width
     const h = img.naturalHeight || img.height
@@ -171,6 +275,16 @@ export async function analyzePhoto(photoId: string, dataUrl: string): Promise<Ph
         orientation: analysis.orientation,
         sharpnessScore: analysis.sharpnessScore,
         smartCrop: analysis.smartCrop,
+      }
+
+      // Color analysis (Phase 2)
+      try {
+        const colorData = await analyzeColors(img)
+        enhancedFields.dominantColors = colorData.dominantColors
+        enhancedFields.isDark = colorData.isDark
+        enhancedFields.averageLuminance = colorData.averageLuminance
+      } catch {
+        // Color analysis is optional — fall back gracefully
       }
 
       // If smartcrop found a better position, use it as subjectCenter

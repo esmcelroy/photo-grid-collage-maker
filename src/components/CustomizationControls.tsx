@@ -1,14 +1,24 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { CollageSettings } from '@/lib/types'
+import { cn } from '@/lib/utils'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Palette } from '@phosphor-icons/react'
+import { Palette, Sparkle, CircleNotch } from '@phosphor-icons/react'
+import type { DominantColor, SuggestedColor } from '@/lib/color-intelligence'
+import { suggestBackgroundColors, averageLuminanceFromColors } from '@/lib/color-intelligence'
+import type { DetectionMode } from '@/hooks/use-smart-position'
+import type { WorkerStatus } from '@/lib/ml-worker-client'
 
 interface CustomizationControlsProps {
   settings: CollageSettings
   onSettingsChange: (settings: CollageSettings) => void
+  photoColors?: DominantColor[]
+  smartPositionEnabled?: boolean
+  detectionMode?: DetectionMode
+  onDetectionModeChange?: (mode: DetectionMode) => void
+  workerStatus?: WorkerStatus
 }
 
 const PRESET_COLORS = [
@@ -26,10 +36,21 @@ const PRESET_COLORS = [
 
 export function CustomizationControls({
   settings,
-  onSettingsChange
+  onSettingsChange,
+  photoColors,
+  smartPositionEnabled,
+  detectionMode,
+  onDetectionModeChange,
+  workerStatus,
 }: CustomizationControlsProps) {
   const gapSliderRef = useRef<HTMLDivElement>(null)
   const radiusSliderRef = useRef<HTMLDivElement>(null)
+
+  const suggestedColors: SuggestedColor[] = useMemo(() => {
+    if (!photoColors || photoColors.length === 0) return []
+    const avgLum = averageLuminanceFromColors(photoColors)
+    return suggestBackgroundColors(photoColors, avgLum)
+  }, [photoColors])
 
   // Radix Slider doesn't forward aria-label to Thumb, so inject it post-render
   useEffect(() => {
@@ -86,10 +107,113 @@ export function CustomizationControls({
           />
         </div>
 
+        {smartPositionEnabled && onDetectionModeChange && (
+          <div>
+            <Label className="text-sm font-medium mb-3 block">
+              Detection Mode
+            </Label>
+            <div className="space-y-2" role="radiogroup" aria-label="Detection mode">
+              <label className="flex items-start gap-3 p-2.5 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                <input
+                  type="radio"
+                  name="detection-mode"
+                  value="basic"
+                  checked={detectionMode === 'basic'}
+                  onChange={() => onDetectionModeChange('basic')}
+                  className="mt-0.5 accent-primary"
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium">Basic</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">Edge-based positioning only. No downloads.</p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 p-2.5 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                <input
+                  type="radio"
+                  name="detection-mode"
+                  value="standard"
+                  checked={detectionMode === 'standard'}
+                  onChange={() => onDetectionModeChange('standard')}
+                  className="mt-0.5 accent-primary"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Standard</span>
+                    {workerStatus === 'loading' && (
+                      <CircleNotch className="w-3.5 h-3.5 text-primary animate-spin" weight="bold" />
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    + Face detection. ~2 MB one-time download.
+                  </p>
+                </div>
+              </label>
+              <label className={cn(
+                "flex items-start gap-3 p-2.5 rounded-lg transition-colors",
+                detectionMode === 'advanced'
+                  ? "bg-primary/5 ring-1 ring-primary/30"
+                  : "hover:bg-muted/50 cursor-pointer"
+              )}>
+                <input
+                  type="radio"
+                  name="detection-mode"
+                  value="advanced"
+                  checked={detectionMode === 'advanced'}
+                  onChange={() => onDetectionModeChange('advanced')}
+                  className="mt-0.5"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium">Advanced</span>
+                    {detectionMode === 'advanced' && workerStatus === 'loading' && (
+                      <CircleNotch className="w-3.5 h-3.5 text-primary animate-spin" weight="bold" />
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    + Object detection (pets, food, etc). ~4 MB download.
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+        )}
+
         <div>
           <Label className="text-sm font-medium mb-3 block">
             Background Color
           </Label>
+          {suggestedColors.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Sparkle className="w-3.5 h-3.5 text-purple-500" weight="duotone" />
+                <span className="text-xs font-medium text-muted-foreground">Suggested for your photos</span>
+              </div>
+              <div className="grid grid-cols-5 gap-2">
+                {suggestedColors.map((color) => (
+                  <button
+                    key={color.hex}
+                    onClick={() =>
+                      onSettingsChange({ ...settings, backgroundColor: color.hex })
+                    }
+                    className="group relative aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105"
+                    style={{
+                      backgroundColor: color.hex,
+                      borderColor: settings.backgroundColor === color.hex
+                        ? '#7c3aed'
+                        : '#d4d0dc'
+                    }}
+                    title={`${color.name}: ${color.reason}`}
+                  >
+                    {settings.backgroundColor === color.hex && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-2 h-2 bg-accent rounded-full" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-5 gap-2">
             {PRESET_COLORS.map((color) => (
               <button
