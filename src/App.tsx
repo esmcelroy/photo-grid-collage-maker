@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useCollageApi } from '@/hooks/useCollageApi'
 import { UploadedPhoto, PhotoPosition, GridLayout, CollageSettings, ExportOptions, MAX_PHOTOS } from '@/lib/types'
 import { getLayoutsForPhotoCount, getUniqueAreaNames } from '@/lib/layouts'
-import { fileToDataUrl, generateUniqueId, downloadCollage } from '@/lib/image-utils'
+import { correctExifOrientation, generateUniqueId, downloadCollage } from '@/lib/image-utils'
 import { processFilesForHeic } from '@/lib/heic-utils'
 import { UploadZone } from '@/components/UploadZone'
 import { PhotoThumbnail } from '@/components/PhotoThumbnail'
@@ -249,7 +249,7 @@ function App() {
 
       await Promise.all(
         converted.map(async (file) => {
-          const dataUrl = await fileToDataUrl(file)
+          const { dataUrl } = await correctExifOrientation(file)
           const id = generateUniqueId()
           await addPhoto({ id, dataUrl, fileName: file.name })
         })

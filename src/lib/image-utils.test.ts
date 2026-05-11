@@ -11,6 +11,7 @@ import {
   parseGridTemplate,
   parseGridAreas,
   fileToDataUrl,
+  correctExifOrientation,
   convertModernColors,
   replaceOklchInSubtree,
   replaceOklchCustomProperties,
@@ -236,6 +237,51 @@ describe('fileToDataUrl', () => {
     const pngFile = new File(['png-bytes'], 'image.png', { type: 'image/png' })
     const result = await fileToDataUrl(pngFile)
     expect(result).toMatch(/^data:image\/png;base64,/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// correctExifOrientation
+// ---------------------------------------------------------------------------
+
+describe('correctExifOrientation', () => {
+  it('returns data URL and orientation 1 for files without EXIF data', async () => {
+    const file = new File(['image bytes'], 'photo.jpg', { type: 'image/jpeg' })
+    const result = await correctExifOrientation(file)
+    expect(result.exifOrientation).toBe(1)
+    expect(typeof result.dataUrl).toBe('string')
+    expect(result.dataUrl).toMatch(/^data:/)
+  })
+
+  it('returns data URL and orientation 1 for PNG files', async () => {
+    const file = new File(['png bytes'], 'photo.png', { type: 'image/png' })
+    const result = await correctExifOrientation(file)
+    expect(result.exifOrientation).toBe(1)
+    expect(typeof result.dataUrl).toBe('string')
+  })
+
+  it('returns data URL and orientation 1 for plain text files', async () => {
+    const file = new File(['hello'], 'test.txt', { type: 'text/plain' })
+    const result = await correctExifOrientation(file)
+    expect(result.exifOrientation).toBe(1)
+    expect(typeof result.dataUrl).toBe('string')
+  })
+
+  it('handles exifr import failure gracefully', async () => {
+    // exifr.parse on a non-image file may throw; the function should catch it
+    const file = new File(['not an image'], 'bad.bin', { type: 'application/octet-stream' })
+    const result = await correctExifOrientation(file)
+    expect(result.exifOrientation).toBe(1)
+    expect(typeof result.dataUrl).toBe('string')
+  })
+
+  it('returns result object with expected shape', async () => {
+    const file = new File(['data'], 'test.jpg', { type: 'image/jpeg' })
+    const result = await correctExifOrientation(file)
+    expect(result).toHaveProperty('dataUrl')
+    expect(result).toHaveProperty('exifOrientation')
+    expect(typeof result.dataUrl).toBe('string')
+    expect(typeof result.exifOrientation).toBe('number')
   })
 })
 
