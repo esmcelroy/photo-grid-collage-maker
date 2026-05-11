@@ -79,9 +79,11 @@ export async function initMLWorker(): Promise<void> {
 
   initPromise = new Promise<void>((resolve, reject) => {
     try {
+      // Classic worker (not module) so importScripts() is available.
+      // MediaPipe's bundled WASM loader uses importScripts() to load
+      // the vision runtime from CDN — module workers don't have it.
       worker = new Worker(
         new URL('../workers/ml-worker.ts', import.meta.url),
-        { type: 'module' }
       )
 
       worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
