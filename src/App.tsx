@@ -104,6 +104,7 @@ function App() {
   const [selectedLayout, setSelectedLayout] = useState<GridLayout | null>(null)
   const [showCarousel, setShowCarousel] = useState(false)
   const [compareIds, setCompareIds] = useState<string[]>([])
+  const [analysisVersion, setAnalysisVersion] = useState(0)
   const isComparing = compareIds.length > 0
 
   const compareLayouts = useMemo(
@@ -134,7 +135,8 @@ function App() {
 
     const ranked = rankLayouts(availableLayouts, characteristics)
     return ranked.map(r => availableLayouts.find(l => l.id === r.layoutId)!).filter(Boolean)
-  }, [availableLayouts, photos])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableLayouts, photos, analysisVersion])
 
   // The top-ranked layout gets a "Recommended" badge (only when analysis data exists)
   const recommendedLayoutId = useMemo(() => {
@@ -144,7 +146,8 @@ function App() {
       return cached && (cached.orientation !== undefined || cached.aspectRatio !== undefined)
     })
     return hasAnalysis ? rankedLayouts[0]?.id ?? null : null
-  }, [rankedLayouts, photos])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rankedLayouts, photos, analysisVersion])
 
   // Aggregate dominant colors from all analyzed photos for background suggestions
   const allPhotoColors: DominantColor[] = useMemo(() => {
@@ -157,7 +160,8 @@ function App() {
       }
     }
     return colors
-  }, [photos])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photos, analysisVersion])
 
   const handleToggleCarousel = useCallback(() => {
     setShowCarousel(prev => {
@@ -435,6 +439,8 @@ function App() {
       if (changed && !cancelled) {
         void updatePositions(updatedPositions).catch(() => {})
       }
+      // Bump analysis version so ranking/color memos re-evaluate
+      if (!cancelled) setAnalysisVersion(v => v + 1)
     }
 
     applySmartPositions()
