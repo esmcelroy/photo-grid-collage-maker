@@ -420,10 +420,14 @@ function App() {
 
     let cancelled = false
     async function applySmartPositions() {
-      const analyses = await Promise.all(
+      const results = await Promise.allSettled(
         photos.map(p => analyzePhotoWithCache(p.id, p.dataUrl))
       )
       if (cancelled) return
+
+      const analyses = results
+        .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof analyzePhotoWithCache>>> => r.status === 'fulfilled')
+        .map(r => r.value)
 
       const updatedPositions = photoPositions.map(pos => {
         const analysis = analyses.find(a => a.photoId === pos.photoId)
