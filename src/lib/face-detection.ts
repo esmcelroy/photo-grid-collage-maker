@@ -40,11 +40,16 @@ export function clearAnalysisCache() {
 }
 
 async function detectSalientRegion(dataUrl: string): Promise<DetectedRegion[]> {
-  const img = new Image()
-  img.src = dataUrl
-  await new Promise(resolve => { img.onload = resolve })
+  try {
+    const img = new Image()
+    img.src = dataUrl
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = () => reject(new Error('Image failed to load'))
+      setTimeout(() => reject(new Error('Image load timeout')), 15000)
+    })
 
-  const canvas = document.createElement('canvas')
+    const canvas = document.createElement('canvas')
   // Use smaller size for performance (max 200px)
   const scale = Math.min(200 / img.width, 200 / img.height, 1)
   canvas.width = Math.round(img.width * scale)
@@ -101,14 +106,17 @@ async function detectSalientRegion(dataUrl: string): Promise<DetectedRegion[]> {
 
   if (sumWeight === 0) return []
 
-  return [{
-    x: minX / w,
-    y: minY / h,
-    width: (maxX - minX) / w,
-    height: (maxY - minY) / h,
-    type: 'salient-region',
-    confidence: 0.7,
-  }]
+    return [{
+      x: minX / w,
+      y: minY / h,
+      width: (maxX - minX) / w,
+      height: (maxY - minY) / h,
+      type: 'salient-region',
+      confidence: 0.7,
+    }]
+  } catch {
+    return []
+  }
 }
 
 async function detectFaces(dataUrl: string): Promise<DetectedRegion[]> {
@@ -118,7 +126,11 @@ async function detectFaces(dataUrl: string): Promise<DetectedRegion[]> {
     const detector = new FaceDetector({ maxDetectedFaces: 10 })
     const img = new Image()
     img.src = dataUrl
-    await new Promise(resolve => { img.onload = resolve })
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = () => reject(new Error('Image failed to load'))
+      setTimeout(() => reject(new Error('Image load timeout')), 15000)
+    })
 
     const faces = await detector.detect(img)
     return faces.map(face => ({
@@ -157,7 +169,11 @@ export async function analyzePhoto(photoId: string, dataUrl: string): Promise<Ph
   try {
     const img = new Image()
     img.src = dataUrl
-    await new Promise(resolve => { img.onload = resolve })
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = () => reject(new Error('Image failed to load'))
+      setTimeout(() => reject(new Error('Image load timeout')), 15000)
+    })
 
     const w = img.naturalWidth || img.width
     const h = img.naturalHeight || img.height
