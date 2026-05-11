@@ -24,10 +24,12 @@ import { toast } from 'sonner'
 import { useCollageHistory, CollageSnapshot } from '@/hooks/use-collage-history'
 import { useDarkMode } from '@/hooks/use-dark-mode'
 import { useSmartPositioning } from '@/hooks/use-smart-position'
-import { analyzePhotoWithCache, calculateSmartPosition, getCachedAnalysis } from '@/lib/face-detection'
+import { analyzePhotoWithCache, calculateSmartPosition, getCachedAnalysis, clearAnalysisCache, setAnalysisDetectionMode } from '@/lib/face-detection'
 import { rankLayouts, suggestPhotoArrangement } from '@/lib/layout-scoring'
 import type { PhotoCharacteristics } from '@/lib/layout-scoring'
 import type { DominantColor } from '@/lib/color-intelligence'
+import { initMLWorker, disposeMLWorker, getWorkerStatus, onWorkerStatusChange, hasNativeFaceDetector } from '@/lib/ml-worker-client'
+import type { WorkerStatus } from '@/lib/ml-worker-client'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -81,7 +83,7 @@ function App() {
 
   const { canUndo, canRedo, pushSnapshot, undo, redo, setRestoring, clear: clearHistory } = useCollageHistory()
   const { theme, setTheme, isDark } = useDarkMode()
-  const { enabled: smartPositionEnabled, setEnabled: setSmartPositionEnabled } = useSmartPositioning()
+  const { enabled: smartPositionEnabled, setEnabled: setSmartPositionEnabled, detectionMode, setDetectionMode } = useSmartPositioning()
 
   const cycleTheme = useCallback(() => {
     const next = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'
@@ -105,7 +107,46 @@ function App() {
   const [showCarousel, setShowCarousel] = useState(false)
   const [compareIds, setCompareIds] = useState<string[]>([])
   const [analysisVersion, setAnalysisVersion] = useState(0)
+  const [workerStatus, setWorkerStatus] = useState<WorkerStatus>(getWorkerStatus)
   const isComparing = compareIds.length > 0
+
+  // Track ML worker status changes
+  useEffect(() => {
+    return onWorkerStatusChange(setWorkerStatus)
+  }, [])
+
+  // Initialize or dispose ML worker based on detection mode
+  useEffect(() => {
+    if (!smartPositionEnabled || detectionMode !== 'standard') {
+      // Dispose worker when not needed
+      if (workerStatus !== 'idle') disposeMLWorker()
+      return
+    }
+
+    // On Chrome/Edge, native FaceDetector handles faces — no worker needed
+    if (hasNativeFaceDetector()) return
+
+    // Initialize worker for standard mode on browsers without native FaceDetector
+    let cancelled = false
+    initMLWorker().catch(() => {
+      if (!cancelled) {
+        toast.error('Face detection model failed to load. Using basic mode.')
+        setDetectionMode('basic')
+      }
+    })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [smartPositionEnabled, detectionMode])
+
+  // When detection mode changes, clear analysis cache so photos get re-analyzed
+  const prevDetectionMode = useRef(detectionMode)
+  useEffect(() => {
+    if (prevDetectionMode.current !== detectionMode) {
+      prevDetectionMode.current = detectionMode
+      clearAnalysisCache()
+      setAnalysisVersion(v => v + 1)
+    }
+  }, [detectionMode])
 
   const compareLayouts = useMemo(
     () => compareIds.map(id => availableLayouts.find(l => l.id === id)).filter(Boolean) as GridLayout[],
@@ -418,6 +459,9 @@ function App() {
   useEffect(() => {
     if (!smartPositionEnabled || !selectedLayout || photos.length === 0) return
 
+    // Sync detection mode to analysis pipeline before running
+    setAnalysisDetectionMode(detectionMode)
+
     let cancelled = false
     async function applySmartPositions() {
       const results = await Promise.allSettled(
@@ -450,7 +494,7 @@ function App() {
     applySmartPositions()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [smartPositionEnabled, selectedLayoutId, photos.length])
+  }, [smartPositionEnabled, selectedLayoutId, photos.length, detectionMode, analysisVersion])
 
   // Derived state for edit dialog
   const editingPosition = editingArea
@@ -674,6 +718,10 @@ function App() {
                     settings={settings}
                     onSettingsChange={handleSettingsChange}
                     photoColors={allPhotoColors}
+                    smartPositionEnabled={smartPositionEnabled}
+                    detectionMode={detectionMode}
+                    onDetectionModeChange={setDetectionMode}
+                    workerStatus={workerStatus}
                   />
                 </CollapsibleSection>
 

@@ -4,14 +4,20 @@ import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Palette, Sparkle } from '@phosphor-icons/react'
+import { Palette, Sparkle, CircleNotch } from '@phosphor-icons/react'
 import type { DominantColor, SuggestedColor } from '@/lib/color-intelligence'
 import { suggestBackgroundColors, averageLuminanceFromColors } from '@/lib/color-intelligence'
+import type { DetectionMode } from '@/hooks/use-smart-position'
+import type { WorkerStatus } from '@/lib/ml-worker-client'
 
 interface CustomizationControlsProps {
   settings: CollageSettings
   onSettingsChange: (settings: CollageSettings) => void
   photoColors?: DominantColor[]
+  smartPositionEnabled?: boolean
+  detectionMode?: DetectionMode
+  onDetectionModeChange?: (mode: DetectionMode) => void
+  workerStatus?: WorkerStatus
 }
 
 const PRESET_COLORS = [
@@ -31,6 +37,10 @@ export function CustomizationControls({
   settings,
   onSettingsChange,
   photoColors,
+  smartPositionEnabled,
+  detectionMode,
+  onDetectionModeChange,
+  workerStatus,
 }: CustomizationControlsProps) {
   const gapSliderRef = useRef<HTMLDivElement>(null)
   const radiusSliderRef = useRef<HTMLDivElement>(null)
@@ -95,6 +105,66 @@ export function CustomizationControls({
             className="w-full"
           />
         </div>
+
+        {smartPositionEnabled && onDetectionModeChange && (
+          <div>
+            <Label className="text-sm font-medium mb-3 block">
+              Detection Mode
+            </Label>
+            <div className="space-y-2" role="radiogroup" aria-label="Detection mode">
+              <label className="flex items-start gap-3 p-2.5 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                <input
+                  type="radio"
+                  name="detection-mode"
+                  value="basic"
+                  checked={detectionMode === 'basic'}
+                  onChange={() => onDetectionModeChange('basic')}
+                  className="mt-0.5 accent-primary"
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium">Basic</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">Edge-based positioning only. No downloads.</p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 p-2.5 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                <input
+                  type="radio"
+                  name="detection-mode"
+                  value="standard"
+                  checked={detectionMode === 'standard'}
+                  onChange={() => onDetectionModeChange('standard')}
+                  className="mt-0.5 accent-primary"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Standard</span>
+                    {workerStatus === 'loading' && (
+                      <CircleNotch className="w-3.5 h-3.5 text-primary animate-spin" weight="bold" />
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    + Face detection. ~2 MB one-time download.
+                  </p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 p-2.5 rounded-lg cursor-not-allowed opacity-50">
+                <input
+                  type="radio"
+                  name="detection-mode"
+                  value="advanced"
+                  disabled
+                  className="mt-0.5"
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium">Advanced</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    + Object detection. Coming soon.
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+        )}
 
         <div>
           <Label className="text-sm font-medium mb-3 block">

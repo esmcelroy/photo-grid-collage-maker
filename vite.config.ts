@@ -57,6 +57,27 @@ export default defineConfig({
         // Exclude large WASM-based chunks from precache (loaded on demand)
         globIgnores: ['**/libheif-js-*.js'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        // Cache MediaPipe WASM + model files fetched from CDN at runtime
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/npm\/@mediapipe\/tasks-vision/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'mediapipe-wasm',
+              expiration: { maxEntries: 10, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/storage\.googleapis\.com\/mediapipe-models/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'mediapipe-models',
+              expiration: { maxEntries: 5, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
     }) as PluginOption,
   ],

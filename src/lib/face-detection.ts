@@ -2,6 +2,8 @@ import type { PhotoOrientation } from './image-analysis'
 import { smartCropToObjectPosition, analyzeImage } from './image-analysis'
 import type { DominantColor } from './color-intelligence'
 import { analyzeColors } from './color-intelligence'
+import { detectFacesML, hasNativeFaceDetector, getWorkerStatus } from './ml-worker-client'
+import type { DetectionMode } from '@/hooks/use-smart-position'
 
 export interface DetectedRegion {
   x: number      // 0-1 normalized
@@ -119,7 +121,7 @@ async function detectSalientRegion(dataUrl: string): Promise<DetectedRegion[]> {
   }
 }
 
-async function detectFaces(dataUrl: string): Promise<DetectedRegion[]> {
+async function detectFacesNative(dataUrl: string): Promise<DetectedRegion[]> {
   if (typeof FaceDetector === 'undefined') return []
 
   try {
@@ -146,9 +148,48 @@ async function detectFaces(dataUrl: string): Promise<DetectedRegion[]> {
   }
 }
 
+// Route face detection based on detection mode:
+// - basic: skip face detection entirely
+// - standard: use native FaceDetector on Chrome, ML worker on Safari/Firefox
+// - advanced: reserved for Phase 5
+async function detectFaces(dataUrl: string, mode: DetectionMode, photoId?: string): Promise<DetectedRegion[]> {
+  if (mode === 'basic') return []
+
+  // Standard mode: prefer native API, fall back to ML worker
+  if (hasNativeFaceDetector()) {
+    return detectFacesNative(dataUrl)
+  }
+
+  // Use ML worker if available
+  if (getWorkerStatus() === 'ready') {
+    try {
+      const faces = await detectFacesML(photoId ?? 'unknown', dataUrl)
+      return faces.map(f => ({
+        x: f.x,
+        y: f.y,
+        width: f.width,
+        height: f.height,
+        type: 'face' as const,
+        confidence: f.confidence,
+      }))
+    } catch {
+      return []
+    }
+  }
+
+  return []
+}
+
+// Module-level detection mode — set before calling analyzePhoto
+let currentDetectionMode: DetectionMode = 'basic'
+
+export function setAnalysisDetectionMode(mode: DetectionMode): void {
+  currentDetectionMode = mode
+}
+
 export async function analyzePhoto(photoId: string, dataUrl: string): Promise<PhotoAnalysis> {
   const [faces, salient] = await Promise.all([
-    detectFaces(dataUrl),
+    detectFaces(dataUrl, currentDetectionMode, photoId),
     detectSalientRegion(dataUrl),
   ])
 

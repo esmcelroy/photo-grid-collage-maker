@@ -107,4 +107,96 @@ describe('CustomizationControls', () => {
       expect.objectContaining({ backgroundColor: '#ff0000' })
     )
   })
+
+  // ─── detection mode radio buttons ──────────────────────────────────────────
+
+  it('does not show detection mode when Smart Position is off', () => {
+    render(
+      <CustomizationControls
+        settings={defaultSettings}
+        onSettingsChange={jest.fn()}
+        smartPositionEnabled={false}
+        detectionMode="basic"
+        onDetectionModeChange={jest.fn()}
+      />
+    )
+    expect(screen.queryByText('Detection Mode')).not.toBeInTheDocument()
+  })
+
+  it('shows detection mode radio buttons when Smart Position is on', () => {
+    render(
+      <CustomizationControls
+        settings={defaultSettings}
+        onSettingsChange={jest.fn()}
+        smartPositionEnabled={true}
+        detectionMode="basic"
+        onDetectionModeChange={jest.fn()}
+      />
+    )
+    expect(screen.getByText('Detection Mode')).toBeInTheDocument()
+    expect(screen.getByText('Basic')).toBeInTheDocument()
+    expect(screen.getByText('Standard')).toBeInTheDocument()
+    expect(screen.getByText('Advanced')).toBeInTheDocument()
+  })
+
+  it('calls onDetectionModeChange when Standard is selected', async () => {
+    const onModeChange = jest.fn()
+    render(
+      <CustomizationControls
+        settings={defaultSettings}
+        onSettingsChange={jest.fn()}
+        smartPositionEnabled={true}
+        detectionMode="basic"
+        onDetectionModeChange={onModeChange}
+      />
+    )
+    const standardRadio = screen.getByDisplayValue('standard')
+    await userEvent.click(standardRadio)
+    expect(onModeChange).toHaveBeenCalledWith('standard')
+  })
+
+  it('disables the Advanced radio option', () => {
+    render(
+      <CustomizationControls
+        settings={defaultSettings}
+        onSettingsChange={jest.fn()}
+        smartPositionEnabled={true}
+        detectionMode="basic"
+        onDetectionModeChange={jest.fn()}
+      />
+    )
+    const advancedRadio = screen.getByDisplayValue('advanced')
+    expect(advancedRadio).toBeDisabled()
+  })
+
+  it('shows spinner when worker is loading', () => {
+    const { container } = render(
+      <CustomizationControls
+        settings={defaultSettings}
+        onSettingsChange={jest.fn()}
+        smartPositionEnabled={true}
+        detectionMode="standard"
+        onDetectionModeChange={jest.fn()}
+        workerStatus="loading"
+      />
+    )
+    // CircleNotch spinner should be present with animate-spin class
+    const spinner = container.querySelector('.animate-spin')
+    expect(spinner).toBeInTheDocument()
+  })
+
+  it('does not show spinner when worker is ready', () => {
+    const { container } = render(
+      <CustomizationControls
+        settings={defaultSettings}
+        onSettingsChange={jest.fn()}
+        smartPositionEnabled={true}
+        detectionMode="standard"
+        onDetectionModeChange={jest.fn()}
+        workerStatus="ready"
+      />
+    )
+    const spinner = container.querySelector('.animate-spin')
+    expect(spinner).not.toBeInTheDocument()
+  })
 })
