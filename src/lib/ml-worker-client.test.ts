@@ -71,7 +71,7 @@ describe('ml-worker-client', () => {
       }
 
       await promise
-      expect(mockPostMessage).toHaveBeenCalledWith({ type: 'init' })
+      expect(mockPostMessage).toHaveBeenCalledWith({ type: 'init', model: 'face' })
       expect(getWorkerStatus()).toBe('ready')
     })
 

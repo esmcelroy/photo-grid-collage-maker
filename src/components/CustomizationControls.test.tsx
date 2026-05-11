@@ -155,7 +155,7 @@ describe('CustomizationControls', () => {
     expect(onModeChange).toHaveBeenCalledWith('standard')
   })
 
-  it('disables the Advanced radio option', () => {
+  it('enables the Advanced radio option for selection', () => {
     render(
       <CustomizationControls
         settings={defaultSettings}
@@ -166,7 +166,7 @@ describe('CustomizationControls', () => {
       />
     )
     const advancedRadio = screen.getByDisplayValue('advanced')
-    expect(advancedRadio).toBeDisabled()
+    expect(advancedRadio).not.toBeDisabled()
   })
 
   it('shows spinner when worker is loading', () => {
