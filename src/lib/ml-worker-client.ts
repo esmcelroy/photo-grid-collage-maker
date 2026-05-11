@@ -1,17 +1,26 @@
-// Typed client for the ML face detection Web Worker
+// Typed client for the ML detection Web Worker
 // Provides Promise-based API wrapping postMessage/onmessage
+// Supports face detection (Standard) and combined face+object detection (Advanced)
 
-import type { FaceBox, WorkerResponse } from '@/workers/ml-worker'
+import type { FaceBox, ObjectBox, WorkerResponse, ModelSelection } from '@/workers/ml-worker'
+
+export type { FaceBox, ObjectBox }
 
 export type WorkerStatus = 'idle' | 'loading' | 'ready' | 'error'
 
+export interface CombinedDetectionResult {
+  faces: FaceBox[]
+  objects: ObjectBox[]
+}
+
 type PendingDetection = {
-  resolve: (faces: FaceBox[]) => void
+  resolve: (result: FaceBox[] | CombinedDetectionResult) => void
   reject: (err: Error) => void
 }
 
 let worker: Worker | null = null
 let status: WorkerStatus = 'idle'
+let currentModel: ModelSelection = 'face'
 let initPromise: Promise<void> | null = null
 const pendingDetections = new Map<string, PendingDetection>()
 const statusListeners = new Set<(status: WorkerStatus) => void>()
@@ -25,6 +34,10 @@ export function getWorkerStatus(): WorkerStatus {
   return status
 }
 
+export function getWorkerModel(): ModelSelection {
+  return currentModel
+}
+
 export function onWorkerStatusChange(fn: (status: WorkerStatus) => void): () => void {
   statusListeners.add(fn)
   return () => statusListeners.delete(fn)
@@ -36,6 +49,11 @@ function handleWorkerMessage(e: MessageEvent<WorkerResponse>) {
   switch (msg.type) {
     case 'loading':
       setStatus('loading')
+      break
+
+    case 'face-ready':
+    case 'object-ready':
+      // Intermediate progress — still loading
       break
 
     case 'ready':
@@ -61,6 +79,16 @@ function handleWorkerMessage(e: MessageEvent<WorkerResponse>) {
       }
       break
 
+    case 'combined-result':
+      if (msg.photoId) {
+        const pending = pendingDetections.get(msg.photoId)
+        if (pending) {
+          pending.resolve({ faces: msg.faces ?? [], objects: msg.objects ?? [] })
+          pendingDetections.delete(msg.photoId)
+        }
+      }
+      break
+
     case 'error':
       if (msg.photoId) {
         const pending = pendingDetections.get(msg.photoId)
@@ -73,10 +101,17 @@ function handleWorkerMessage(e: MessageEvent<WorkerResponse>) {
   }
 }
 
-export async function initMLWorker(): Promise<void> {
-  if (initPromise) return initPromise
-  if (status === 'ready') return
+export async function initMLWorker(model: ModelSelection = 'face'): Promise<void> {
+  // If already initialized with the same model, reuse
+  if (initPromise && currentModel === model && status === 'ready') return
+  // If requesting a different model, dispose and reinitialize
+  if (worker && currentModel !== model) {
+    disposeMLWorker()
+  }
 
+  if (initPromise) return initPromise
+
+  currentModel = model
   initPromise = new Promise<void>((resolve, reject) => {
     try {
       // Classic worker (not module) so importScripts() is available.
@@ -97,7 +132,7 @@ export async function initMLWorker(): Promise<void> {
         reject(new Error(err.message || 'Worker failed to load'))
       }
 
-      worker.postMessage({ type: 'init' })
+      worker.postMessage({ type: 'init', model })
     } catch (err) {
       setStatus('error')
       initPromise = null
@@ -125,10 +160,7 @@ export async function detectFacesML(photoId: string, dataUrl: string): Promise<F
     throw new Error('ML Worker not ready')
   }
 
-  // Convert data URL to ImageBitmap for transfer to worker
-  const response = await fetch(dataUrl)
-  const blob = await response.blob()
-  const imageBitmap = await createImageBitmap(blob)
+  const imageBitmap = await dataUrlToImageBitmap(dataUrl)
 
   return new Promise<FaceBox[]>((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -137,9 +169,14 @@ export async function detectFacesML(photoId: string, dataUrl: string): Promise<F
     }, 30000)
 
     pendingDetections.set(photoId, {
-      resolve: (faces) => {
+      resolve: (result) => {
         clearTimeout(timeout)
-        resolve(faces)
+        // For face-only mode, result is FaceBox[]
+        if (Array.isArray(result)) {
+          resolve(result)
+        } else {
+          resolve(result.faces)
+        }
       },
       reject: (err) => {
         clearTimeout(timeout)
@@ -152,6 +189,56 @@ export async function detectFacesML(photoId: string, dataUrl: string): Promise<F
       [imageBitmap] // Transfer ownership
     )
   })
+}
+
+/**
+ * Detect both faces and objects in a photo (Advanced mode).
+ * Returns combined results for region merging.
+ * Worker must be initialized with model='both' via initMLWorker('both').
+ */
+export async function detectCombined(photoId: string, dataUrl: string): Promise<CombinedDetectionResult> {
+  if (!worker || status !== 'ready') {
+    throw new Error('ML Worker not ready')
+  }
+
+  if (currentModel !== 'both' && currentModel !== 'object') {
+    throw new Error('Worker not initialized with object detection model')
+  }
+
+  const imageBitmap = await dataUrlToImageBitmap(dataUrl)
+
+  return new Promise<CombinedDetectionResult>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      pendingDetections.delete(photoId)
+      reject(new Error('Combined detection timeout'))
+    }, 45000) // Slightly longer for two models
+
+    pendingDetections.set(photoId, {
+      resolve: (result) => {
+        clearTimeout(timeout)
+        if (Array.isArray(result)) {
+          resolve({ faces: result, objects: [] })
+        } else {
+          resolve(result)
+        }
+      },
+      reject: (err) => {
+        clearTimeout(timeout)
+        reject(err)
+      },
+    })
+
+    worker!.postMessage(
+      { type: 'detect', photoId, imageData: imageBitmap },
+      [imageBitmap]
+    )
+  })
+}
+
+async function dataUrlToImageBitmap(dataUrl: string): Promise<ImageBitmap> {
+  const response = await fetch(dataUrl)
+  const blob = await response.blob()
+  return createImageBitmap(blob)
 }
 
 export function disposeMLWorker(): void {
