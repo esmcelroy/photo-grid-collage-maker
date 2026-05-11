@@ -2,7 +2,8 @@ import type { PhotoOrientation } from './image-analysis'
 import { smartCropToObjectPosition, analyzeImage } from './image-analysis'
 import type { DominantColor } from './color-intelligence'
 import { analyzeColors } from './color-intelligence'
-import { detectFacesML, hasNativeFaceDetector, getWorkerStatus } from './ml-worker-client'
+import { detectFacesML, detectCombined, hasNativeFaceDetector, getWorkerStatus, getWorkerModel } from './ml-worker-client'
+import { mergeDetections, computeWeightedCentroid, computeEnclosingBbox } from './region-merge'
 import type { DetectionMode } from '@/hooks/use-smart-position'
 
 export interface DetectedRegion {
@@ -151,9 +152,49 @@ async function detectFacesNative(dataUrl: string): Promise<DetectedRegion[]> {
 // Route face detection based on detection mode:
 // - basic: skip face detection entirely
 // - standard: use native FaceDetector on Chrome, ML worker on Safari/Firefox
-// - advanced: reserved for Phase 5
+// - advanced: use ML worker with combined face + object detection
 async function detectFaces(dataUrl: string, mode: DetectionMode, photoId?: string): Promise<DetectedRegion[]> {
   if (mode === 'basic') return []
+
+  // Advanced mode: combined face + object detection
+  if (mode === 'advanced') {
+    if (getWorkerStatus() === 'ready' && (getWorkerModel() === 'both' || getWorkerModel() === 'object')) {
+      try {
+        const combined = await detectCombined(photoId ?? 'unknown', dataUrl)
+        const merged = mergeDetections(combined.faces, combined.objects)
+
+        if (merged.length === 0) return []
+
+        // Convert weighted regions to DetectedRegion[] for the existing pipeline
+        const centroid = computeWeightedCentroid(merged)
+        const bbox = computeEnclosingBbox(merged)
+
+        if (bbox) {
+          return [{
+            x: bbox.x,
+            y: bbox.y,
+            width: bbox.width,
+            height: bbox.height,
+            type: 'salient-region',
+            confidence: Math.max(...merged.map(r => r.confidence * r.weight)),
+          }]
+        }
+
+        // Fallback: use centroid as a point region
+        return [{
+          x: centroid.x - 0.1,
+          y: centroid.y - 0.1,
+          width: 0.2,
+          height: 0.2,
+          type: 'salient-region',
+          confidence: 0.8,
+        }]
+      } catch {
+        // Fall through to standard face detection
+      }
+    }
+    // Fallback: try standard face detection if advanced fails
+  }
 
   // Standard mode: prefer native API, fall back to ML worker
   if (hasNativeFaceDetector()) {

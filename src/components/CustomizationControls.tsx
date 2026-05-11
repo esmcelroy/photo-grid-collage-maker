@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { CollageSettings } from '@/lib/types'
+import { cn } from '@/lib/utils'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
@@ -147,18 +148,29 @@ export function CustomizationControls({
                   </p>
                 </div>
               </label>
-              <label className="flex items-start gap-3 p-2.5 rounded-lg cursor-not-allowed opacity-50">
+              <label className={cn(
+                "flex items-start gap-3 p-2.5 rounded-lg transition-colors",
+                detectionMode === 'advanced'
+                  ? "bg-primary/5 ring-1 ring-primary/30"
+                  : "hover:bg-muted/50 cursor-pointer"
+              )}>
                 <input
                   type="radio"
                   name="detection-mode"
                   value="advanced"
-                  disabled
+                  checked={detectionMode === 'advanced'}
+                  onChange={() => onDetectionModeChange('advanced')}
                   className="mt-0.5"
                 />
                 <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium">Advanced</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium">Advanced</span>
+                    {detectionMode === 'advanced' && workerStatus === 'loading' && (
+                      <CircleNotch className="w-3.5 h-3.5 text-primary animate-spin" weight="bold" />
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    + Object detection. Coming soon.
+                    + Object detection (pets, food, etc). ~4 MB download.
                   </p>
                 </div>
               </label>

@@ -117,21 +117,23 @@ function App() {
 
   // Initialize or dispose ML worker based on detection mode
   useEffect(() => {
-    if (!smartPositionEnabled || detectionMode !== 'standard') {
+    if (!smartPositionEnabled || detectionMode === 'basic') {
       // Dispose worker when not needed
       if (workerStatus !== 'idle') disposeMLWorker()
       return
     }
 
-    // On Chrome/Edge, native FaceDetector handles faces — no worker needed
-    if (hasNativeFaceDetector()) return
+    // On Chrome/Edge with standard mode, native FaceDetector handles faces — no worker needed
+    if (detectionMode === 'standard' && hasNativeFaceDetector()) return
 
-    // Initialize worker for standard mode on browsers without native FaceDetector
+    // Initialize worker with appropriate model
+    const model = detectionMode === 'advanced' ? 'both' : 'face'
     let cancelled = false
-    initMLWorker().catch(() => {
+    initMLWorker(model).catch(() => {
       if (!cancelled) {
-        toast.error('Face detection model failed to load. Using basic mode.')
-        setDetectionMode('basic')
+        const fallback = detectionMode === 'advanced' ? 'standard' : 'basic'
+        toast.error(`Detection model failed to load. Using ${fallback} mode.`)
+        setDetectionMode(fallback)
       }
     })
     return () => { cancelled = true }
