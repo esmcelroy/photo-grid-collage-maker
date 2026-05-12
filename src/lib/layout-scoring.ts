@@ -2,6 +2,12 @@ import type { GridLayout } from './types'
 import type { PhotoOrientation } from './image-analysis'
 import type { DominantColor, PhotoColorProfile } from './color-intelligence'
 import { scoreColorHarmony } from './color-intelligence'
+import type { PhotoFingerprint } from './photo-similarity'
+import {
+  clusterDuplicates,
+  buildAdjacencyGraph,
+  optimizeForDiversity,
+} from './photo-similarity'
 
 export interface PhotoCharacteristics {
   photoId: string
@@ -11,6 +17,8 @@ export interface PhotoCharacteristics {
   dominantColors?: DominantColor[]
   isDark?: boolean
   averageLuminance?: number
+  dHash?: bigint
+  colorHistogram?: Float32Array
 }
 
 export interface LayoutScore {
@@ -211,7 +219,8 @@ export function rankLayouts(
 
 /**
  * Suggest optimal photo-to-slot assignment for a layout.
- * Places photos in slots that best match their orientation.
+ * Places photos in slots that best match their orientation,
+ * then optimizes for visual diversity between adjacent cells.
  */
 export function suggestPhotoArrangement(
   layout: GridLayout,
@@ -223,9 +232,40 @@ export function suggestPhotoArrangement(
 
   const areas = [...slotOrientations.entries()]
 
-  // First pass: assign best orientation matches
+  // Check if fingerprints are available for diversity optimization
+  const hasFingerprints = photos.some(p => p.dHash !== undefined && p.colorHistogram !== undefined)
+
+  // If we have fingerprints, cluster duplicates and promote sharpest per cluster
+  let photosForAssignment = photos
+  if (hasFingerprints) {
+    const clusters = clusterDuplicates(
+      photos
+        .filter(p => p.dHash !== undefined && p.colorHistogram !== undefined)
+        .map(p => ({
+          photoId: p.photoId,
+          fingerprint: {
+            dHash: p.dHash!,
+            colorHistogram: p.colorHistogram!,
+            luminance: p.averageLuminance ?? 0.5,
+          },
+          sharpnessScore: p.sharpnessScore,
+          orientation: p.orientation,
+        })),
+    )
+
+    // Sort photos: cluster representatives (sharpest per group) first
+    const representatives = new Set(clusters.map(c => c.representative))
+    photosForAssignment = [
+      ...photos.filter(p => representatives.has(p.photoId))
+        .sort((a, b) => b.sharpnessScore - a.sharpnessScore),
+      ...photos.filter(p => !representatives.has(p.photoId))
+        .sort((a, b) => b.sharpnessScore - a.sharpnessScore),
+    ]
+  }
+
+  // First pass: assign best orientation matches (representatives prioritized)
   for (const [area, slotOrientation] of areas) {
-    const bestMatch = photos.find(
+    const bestMatch = photosForAssignment.find(
       p => !assignedPhotos.has(p.photoId) && p.orientation === slotOrientation,
     )
     if (bestMatch) {
@@ -235,7 +275,7 @@ export function suggestPhotoArrangement(
   }
 
   // Second pass: fill remaining slots with sharpest unassigned photos
-  const remaining = photos
+  const remaining = photosForAssignment
     .filter(p => !assignedPhotos.has(p.photoId))
     .sort((a, b) => b.sharpnessScore - a.sharpnessScore)
 
@@ -245,6 +285,31 @@ export function suggestPhotoArrangement(
       assignment.set(area, remaining[remainIdx].photoId)
       remainIdx++
     }
+  }
+
+  // Third pass: optimize for diversity between adjacent cells
+  if (hasFingerprints && assignment.size >= 2) {
+    const adjacency = buildAdjacencyGraph(layout.areas)
+    const fingerprints = new Map<string, PhotoFingerprint>()
+    const photoOrientations = new Map<string, PhotoOrientation>()
+    for (const p of photos) {
+      if (p.dHash !== undefined && p.colorHistogram !== undefined) {
+        fingerprints.set(p.photoId, {
+          dHash: p.dHash,
+          colorHistogram: p.colorHistogram,
+          luminance: p.averageLuminance ?? 0.5,
+        })
+      }
+      photoOrientations.set(p.photoId, p.orientation)
+    }
+
+    return optimizeForDiversity(
+      assignment,
+      adjacency,
+      fingerprints,
+      slotOrientations,
+      photoOrientations,
+    )
   }
 
   return assignment
