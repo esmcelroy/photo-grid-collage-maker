@@ -692,6 +692,25 @@ function App() {
                   onEditPhoto={handleEditPhoto}
                   previewRef={previewRef}
                 />
+
+                {/* Layout strip - directly below preview */}
+                <Card className="p-4">
+                  <h3 className="text-sm font-semibold mb-2">Layout Options</h3>
+                  <LayoutGallery
+                    layouts={rankedLayouts}
+                    photos={photos}
+                    photoPositions={photoPositions}
+                    selectedLayoutId={selectedLayoutId}
+                    onLayoutSelect={handleLayoutSelect}
+                    onArrangementApply={handleArrangementApply}
+                    onAutoLayout={handleAutoLayout}
+                    recommendedLayoutId={recommendedLayoutId}
+                    showCarousel={showCarousel}
+                    onToggleCarousel={handleToggleCarousel}
+                    compareIds={compareIds}
+                    onToggleCompare={handleToggleCompare}
+                  />
+                </Card>
               </div>
             )}
           </div>
@@ -737,23 +756,6 @@ function App() {
                     detectionMode={detectionMode}
                     onDetectionModeChange={setDetectionMode}
                     workerStatus={workerStatus}
-                  />
-                </CollapsibleSection>
-
-                <CollapsibleSection title="Layout Options" defaultOpen={true}>
-                  <LayoutGallery
-                    layouts={rankedLayouts}
-                    photos={photos}
-                    photoPositions={photoPositions}
-                    selectedLayoutId={selectedLayoutId}
-                    onLayoutSelect={handleLayoutSelect}
-                    onArrangementApply={handleArrangementApply}
-                    onAutoLayout={handleAutoLayout}
-                    recommendedLayoutId={recommendedLayoutId}
-                    showCarousel={showCarousel}
-                    onToggleCarousel={handleToggleCarousel}
-                    compareIds={compareIds}
-                    onToggleCompare={handleToggleCompare}
                   />
                 </CollapsibleSection>
               </>
