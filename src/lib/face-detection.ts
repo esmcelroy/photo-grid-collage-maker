@@ -4,6 +4,7 @@ import type { DominantColor } from './color-intelligence'
 import { analyzeColors } from './color-intelligence'
 import { detectFacesML, detectCombined, hasNativeFaceDetector, getWorkerStatus, getWorkerModel } from './ml-worker-client'
 import { mergeDetections, computeWeightedCentroid, computeEnclosingBbox } from './region-merge'
+import { computeDHash, computeColorHistogram } from './photo-similarity'
 import type { DetectionMode } from '@/hooks/use-smart-position'
 
 export interface DetectedRegion {
@@ -30,6 +31,9 @@ export interface PhotoAnalysis {
   dominantColors?: DominantColor[]
   isDark?: boolean
   averageLuminance?: number
+  // Photo similarity fingerprints (Phase 6)
+  dHash?: bigint
+  colorHistogram?: Float32Array
 }
 
 const analysisCache = new Map<string, PhotoAnalysis>()
@@ -285,6 +289,25 @@ export async function analyzePhoto(photoId: string, dataUrl: string): Promise<Ph
         enhancedFields.averageLuminance = colorData.averageLuminance
       } catch {
         // Color analysis is optional — fall back gracefully
+      }
+
+      // Photo similarity fingerprints (Phase 6)
+      try {
+        const hashCanvas = document.createElement('canvas')
+        hashCanvas.width = 9
+        hashCanvas.height = 8
+        const hashCtx = hashCanvas.getContext('2d')!
+        hashCtx.drawImage(img, 0, 0, 9, 8)
+        enhancedFields.dHash = computeDHash(hashCanvas)
+
+        const histCanvas = document.createElement('canvas')
+        histCanvas.width = 32
+        histCanvas.height = 32
+        const histCtx = histCanvas.getContext('2d')!
+        histCtx.drawImage(img, 0, 0, 32, 32)
+        enhancedFields.colorHistogram = computeColorHistogram(histCanvas)
+      } catch {
+        // Fingerprinting is optional — fall back gracefully
       }
 
       // If smartcrop found a better position, use it as subjectCenter

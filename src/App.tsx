@@ -355,6 +355,9 @@ function App() {
         orientation: cached?.orientation ?? 'square',
         aspectRatio: cached?.aspectRatio ?? 1,
         sharpnessScore: cached?.sharpnessScore ?? 0,
+        dHash: cached?.dHash,
+        colorHistogram: cached?.colorHistogram,
+        averageLuminance: cached?.averageLuminance,
       }
     })
 
