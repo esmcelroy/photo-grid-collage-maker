@@ -9,6 +9,27 @@ import {
   optimizeForDiversity,
 } from './photo-similarity'
 
+/**
+ * Compute the fraction of total grid cells each area occupies.
+ */
+export function computeSlotSizes(areas: string[]): Map<string, number> {
+  const cellCounts = new Map<string, number>()
+  let totalCells = 0
+  for (const row of areas) {
+    const cells = row.split(' ')
+    for (const cell of cells) {
+      if (cell === '.') continue
+      cellCounts.set(cell, (cellCounts.get(cell) ?? 0) + 1)
+      totalCells++
+    }
+  }
+  const result = new Map<string, number>()
+  for (const [area, count] of cellCounts) {
+    result.set(area, count / totalCells)
+  }
+  return result
+}
+
 export interface PhotoCharacteristics {
   photoId: string
   orientation: PhotoOrientation
@@ -156,19 +177,17 @@ export function scoreLayout(
     score -= mismatchPenalty
   }
 
-  // 3. Bonus for layouts with a hero/large slot when there's a sharp photo
-  const hasLargeSlot = slotEntries.some(([area]) => {
-    // Areas that span multiple cells are "large"
-    return layout.areas.filter(row => row.includes(area)).length > 1 ||
-      layout.areas.some(row => {
-        const cells = row.split(' ')
-        return cells.filter(c => c === area).length > 1
-      })
-  })
-  const hasSharpPhoto = photos.some(p => p.sharpnessScore > 200)
-  if (hasLargeSlot && hasSharpPhoto) {
-    score += 5
-    reasons.push('Hero slot for sharp photo')
+  // 3. Scaled bonus for layouts with a hero/large slot when there's a sharp photo
+  const slotSizes = computeSlotSizes(layout.areas)
+  const maxSlotFraction = Math.max(...slotSizes.values())
+  const hasLargeSlot = maxSlotFraction > (1 / slotSizes.size)
+  if (hasLargeSlot) {
+    const maxSharpness = Math.max(...photos.map(p => p.sharpnessScore))
+    const heroBonus = Math.round(maxSlotFraction * (Math.min(maxSharpness, 300) / 300) * 25)
+    if (heroBonus >= 2) {
+      score += heroBonus
+      reasons.push(`Hero slot for sharp photo (+${heroBonus})`)
+    }
   }
 
   // 4. Layout aspect ratio vs photo set tendency (strongest signal)
@@ -284,6 +303,49 @@ export function suggestPhotoArrangement(
     if (!assignment.has(area) && remainIdx < remaining.length) {
       assignment.set(area, remaining[remainIdx].photoId)
       remainIdx++
+    }
+  }
+
+  // Sharpness-weighted swap pass: put sharper photos in larger slots
+  const slotSizes = computeSlotSizes(layout.areas)
+  const assignedEntries = [...assignment.entries()]
+  for (let i = 0; i < assignedEntries.length; i++) {
+    for (let j = i + 1; j < assignedEntries.length; j++) {
+      const [area1, photoId1] = assignedEntries[i]
+      const [area2, photoId2] = assignedEntries[j]
+      const photo1 = photosForAssignment.find(p => p.photoId === photoId1)
+      const photo2 = photosForAssignment.find(p => p.photoId === photoId2)
+      if (!photo1 || !photo2) continue
+      if (photo1.sharpnessScore <= 0 && photo2.sharpnessScore <= 0) continue
+
+      const slot1Orientation = slotOrientations.get(area1)
+      const slot2Orientation = slotOrientations.get(area2)
+
+      // Skip if swapping would break orientation constraints
+      const photo1MatchesSlot1 = photo1.orientation === slot1Orientation
+      const photo2MatchesSlot2 = photo2.orientation === slot2Orientation
+      const photo1MatchesSlot2 = photo1.orientation === slot2Orientation
+      const photo2MatchesSlot1 = photo2.orientation === slot1Orientation
+      // If current assignment has orientation matches that would be lost, skip
+      if ((photo1MatchesSlot1 && !photo2MatchesSlot1) ||
+          (photo2MatchesSlot2 && !photo1MatchesSlot2)) {
+        continue
+      }
+
+      const size1 = slotSizes.get(area1) ?? 0
+      const size2 = slotSizes.get(area2) ?? 0
+      const sharp1 = Math.min(photo1.sharpnessScore, 300) / 300
+      const sharp2 = Math.min(photo2.sharpnessScore, 300) / 300
+
+      const currentFit = size1 * sharp1 + size2 * sharp2
+      const swappedFit = size1 * sharp2 + size2 * sharp1
+
+      if (swappedFit > currentFit) {
+        assignment.set(area1, photoId2)
+        assignment.set(area2, photoId1)
+        assignedEntries[i] = [area1, photoId2]
+        assignedEntries[j] = [area2, photoId1]
+      }
     }
   }
 

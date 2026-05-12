@@ -4,6 +4,7 @@ import {
   scoreLayout,
   rankLayouts,
   suggestPhotoArrangement,
+  computeSlotSizes,
 } from './layout-scoring'
 import type { PhotoCharacteristics } from './layout-scoring'
 import type { GridLayout } from './types'
@@ -142,7 +143,7 @@ describe('scoreLayout', () => {
     ]
 
     const result = scoreLayout(heroLayout, sharpPhotos)
-    expect(result.reasons).toContain('Hero slot for sharp photo')
+    expect(result.reasons.some(r => r.startsWith('Hero slot for sharp photo'))).toBe(true)
   })
 
   it('returns non-negative scores', () => {
@@ -222,5 +223,191 @@ describe('suggestPhotoArrangement', () => {
     const values = [...arrangement.values()]
     expect(values).toContain('sharp')
     expect(values).toContain('blurry')
+  })
+
+  it('places sharpest photo in the largest slot after sharpness-weighted swap', () => {
+    // Layout with one large slot (a = 4 cells) and two small slots (b, c = 1 cell each)
+    const layout = makeLayout({
+      id: 'hero-swap',
+      gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
+      areas: ['a a b', 'a a c'],
+      aspectRatio: '3/2',
+    })
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 'medium', orientation: 'square', aspectRatio: 1, sharpnessScore: 100 },
+      { photoId: 'sharp', orientation: 'square', aspectRatio: 1, sharpnessScore: 300 },
+      { photoId: 'blurry', orientation: 'square', aspectRatio: 1, sharpnessScore: 20 },
+    ]
+
+    const arrangement = suggestPhotoArrangement(layout, photos)
+    // The sharpest photo should end up in the largest slot 'a'
+    expect(arrangement.get('a')).toBe('sharp')
+  })
+
+  it('preserves orientation constraints during sharpness-weighted swap', () => {
+    // Layout: 'a' is portrait slot, 'b' and 'c' are landscape slots
+    // ['a b b', 'a c c'] with 1/1 container:
+    //   'a' = 1col/3, 2rows → AR = 0.33 → portrait
+    //   'b' = 2cols/3, 1row → AR = 1.33 → landscape
+    //   'c' = same as b → landscape
+    const layout = makeLayout({
+      id: 'orientation-constrained',
+      gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
+      areas: ['a b b', 'a c c'],
+      aspectRatio: '1/1',
+    })
+    // Portrait photo is very sharp and in portrait slot 'a' (small)
+    // Landscape photos are less sharp and in landscape slots 'b','c' (large)
+    // Swap should NOT move portrait photo into landscape slot even though it's sharper
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 'portrait-sharp', orientation: 'portrait', aspectRatio: 0.7, sharpnessScore: 300 },
+      { photoId: 'land1', orientation: 'landscape', aspectRatio: 1.8, sharpnessScore: 100 },
+      { photoId: 'land2', orientation: 'landscape', aspectRatio: 1.5, sharpnessScore: 50 },
+    ]
+
+    const arrangement = suggestPhotoArrangement(layout, photos)
+    // Portrait photo must stay in portrait slot 'a'
+    expect(arrangement.get('a')).toBe('portrait-sharp')
+  })
+})
+
+describe('computeSlotSizes', () => {
+  it('returns equal fractions for a uniform grid', () => {
+    const sizes = computeSlotSizes(['a b', 'c d'])
+    expect(sizes.get('a')).toBeCloseTo(0.25)
+    expect(sizes.get('b')).toBeCloseTo(0.25)
+    expect(sizes.get('c')).toBeCloseTo(0.25)
+    expect(sizes.get('d')).toBeCloseTo(0.25)
+  })
+
+  it('returns correct fractions for a hero layout', () => {
+    const sizes = computeSlotSizes(['a a b', 'a a c'])
+    expect(sizes.get('a')).toBeCloseTo(0.667, 2)
+    expect(sizes.get('b')).toBeCloseTo(0.167, 2)
+    expect(sizes.get('c')).toBeCloseTo(0.167, 2)
+  })
+
+  it('returns 1.0 for a single-area layout', () => {
+    const sizes = computeSlotSizes(['a'])
+    expect(sizes.get('a')).toBeCloseTo(1.0)
+  })
+
+  it('returns correct fractions for a 2x3 grid with one spanning area', () => {
+    // 'a' spans 2 cells, 'b' spans 2 cells, 'c' and 'd' each span 1 cell
+    const sizes = computeSlotSizes(['a a b', 'c d b'])
+    expect(sizes.get('a')).toBeCloseTo(2 / 6)
+    expect(sizes.get('b')).toBeCloseTo(2 / 6)
+    expect(sizes.get('c')).toBeCloseTo(1 / 6)
+    expect(sizes.get('d')).toBeCloseTo(1 / 6)
+  })
+
+  it('handles a layout where all slots are equal size', () => {
+    const sizes = computeSlotSizes(['a b c', 'd e f'])
+    for (const [, fraction] of sizes) {
+      expect(fraction).toBeCloseTo(1 / 6)
+    }
+  })
+})
+
+describe('scoreLayout hero bonus scaling', () => {
+  it('gives high bonus for large hero slot with very sharp photo (sharpness 300)', () => {
+    // 'a' spans 4 of 6 cells = 0.667 fraction
+    const heroLayout = makeLayout({
+      id: 'big-hero',
+      gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
+      areas: ['a a b', 'a a c'],
+      aspectRatio: '3/2',
+    })
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 's1', orientation: 'square', aspectRatio: 1, sharpnessScore: 300 },
+      { photoId: 's2', orientation: 'square', aspectRatio: 1, sharpnessScore: 50 },
+      { photoId: 's3', orientation: 'square', aspectRatio: 1, sharpnessScore: 50 },
+    ]
+    const result = scoreLayout(heroLayout, photos)
+    // heroBonus = round(0.667 * (300/300) * 25) = round(16.67) = 17
+    expect(result.score).toBeGreaterThanOrEqual(50 + 15) // base + at least 15 from hero
+    expect(result.reasons.some(r => r.startsWith('Hero slot for sharp photo'))).toBe(true)
+  })
+
+  it('gives small bonus for small hero slot with moderately sharp photo', () => {
+    // 'a' spans 2 of 6 cells = 0.333 fraction
+    const smallHeroLayout = makeLayout({
+      id: 'small-hero',
+      gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
+      areas: ['a b c', 'a d e'],
+      aspectRatio: '3/2',
+    })
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 's1', orientation: 'square', aspectRatio: 1, sharpnessScore: 200 },
+      { photoId: 's2', orientation: 'square', aspectRatio: 1, sharpnessScore: 50 },
+      { photoId: 's3', orientation: 'square', aspectRatio: 1, sharpnessScore: 50 },
+      { photoId: 's4', orientation: 'square', aspectRatio: 1, sharpnessScore: 50 },
+      { photoId: 's5', orientation: 'square', aspectRatio: 1, sharpnessScore: 50 },
+    ]
+    const result = scoreLayout(smallHeroLayout, photos)
+    // heroBonus = round(0.333 * (200/300) * 25) = round(5.55) = 6
+    const heroReason = result.reasons.find(r => r.startsWith('Hero slot for sharp photo'))
+    expect(heroReason).toBeDefined()
+    // Extract the bonus from the reason string
+    const bonusMatch = heroReason!.match(/\+(\d+)/)
+    expect(bonusMatch).not.toBeNull()
+    const bonus = parseInt(bonusMatch![1])
+    expect(bonus).toBeGreaterThanOrEqual(3)
+    expect(bonus).toBeLessThanOrEqual(8)
+  })
+
+  it('gives no hero bonus when layout has no large slot', () => {
+    const equalLayout = makeLayout({
+      id: 'equal',
+      gridTemplate: '1fr 1fr',
+      areas: ['a b'],
+      aspectRatio: '2/1',
+    })
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 's1', orientation: 'landscape', aspectRatio: 1.5, sharpnessScore: 400 },
+      { photoId: 's2', orientation: 'landscape', aspectRatio: 1.5, sharpnessScore: 300 },
+    ]
+    const result = scoreLayout(equalLayout, photos)
+    expect(result.reasons.some(r => r.startsWith('Hero slot for sharp photo'))).toBe(false)
+  })
+
+  it('gives no hero bonus when all photos have low sharpness', () => {
+    const heroLayout = makeLayout({
+      id: 'hero-low-sharp',
+      gridTemplate: '1fr 1fr / 1fr 1fr',
+      areas: ['a b', 'a c'],
+      aspectRatio: '1/1',
+    })
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 's1', orientation: 'square', aspectRatio: 1, sharpnessScore: 10 },
+      { photoId: 's2', orientation: 'square', aspectRatio: 1, sharpnessScore: 5 },
+      { photoId: 's3', orientation: 'square', aspectRatio: 1, sharpnessScore: 8 },
+    ]
+    const result = scoreLayout(heroLayout, photos)
+    // heroBonus = round(0.5 * (10/300) * 25) = round(0.42) = 0, which is < 2
+    expect(result.reasons.some(r => r.startsWith('Hero slot for sharp photo'))).toBe(false)
+  })
+
+  it('scales bonus higher for sharper photos (300 vs 100)', () => {
+    const heroLayout = makeLayout({
+      id: 'hero-scale',
+      gridTemplate: '1fr 1fr / 1fr 1fr 1fr',
+      areas: ['a a b', 'a a c'],
+      aspectRatio: '3/2',
+    })
+    const sharpPhotos: PhotoCharacteristics[] = [
+      { photoId: 's1', orientation: 'square', aspectRatio: 1, sharpnessScore: 300 },
+      { photoId: 's2', orientation: 'square', aspectRatio: 1, sharpnessScore: 50 },
+      { photoId: 's3', orientation: 'square', aspectRatio: 1, sharpnessScore: 50 },
+    ]
+    const lessSharpPhotos: PhotoCharacteristics[] = [
+      { photoId: 's1', orientation: 'square', aspectRatio: 1, sharpnessScore: 100 },
+      { photoId: 's2', orientation: 'square', aspectRatio: 1, sharpnessScore: 50 },
+      { photoId: 's3', orientation: 'square', aspectRatio: 1, sharpnessScore: 50 },
+    ]
+
+    const sharpResult = scoreLayout(heroLayout, sharpPhotos)
+    const lessSharpResult = scoreLayout(heroLayout, lessSharpPhotos)
+    expect(sharpResult.score).toBeGreaterThan(lessSharpResult.score)
   })
 })
