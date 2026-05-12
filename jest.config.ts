@@ -10,6 +10,8 @@ const config: Config = {
     'lucide-react/dist/esm/icons/(.*)': '<rootDir>/src/__tests__/__mocks__/lucide-icon.tsx',
     // libheif-js uses WASM which can't run in jsdom
     'libheif-js': '<rootDir>/src/__tests__/__mocks__/libheif-js.ts',
+    // Vite virtual module for PWA service worker registration
+    'virtual:pwa-register/react': '<rootDir>/src/__tests__/__mocks__/virtual-pwa-register-react.ts',
   },
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
   // Only match *.test.ts / *.test.tsx — excludes setup files and Playwright .spec.ts

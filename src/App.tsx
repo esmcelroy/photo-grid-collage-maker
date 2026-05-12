@@ -15,6 +15,9 @@ import { PhotoEditDialog } from '@/components/PhotoEditDialog'
 import { ArrangementCarousel } from '@/components/ArrangementCarousel'
 import { ComparePanel } from '@/components/ComparePanel'
 import { AppFooter } from '@/components/AppFooter'
+import { InstallButton } from '@/components/InstallButton'
+import { OfflineBanner } from '@/components/OfflineBanner'
+import { UpdateToast } from '@/components/UpdateToast'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -24,6 +27,8 @@ import { toast } from 'sonner'
 import { useCollageHistory, CollageSnapshot } from '@/hooks/use-collage-history'
 import { useDarkMode } from '@/hooks/use-dark-mode'
 import { useSmartPositioning } from '@/hooks/use-smart-position'
+import { useOnlineStatus } from '@/hooks/useOnlineStatus'
+import { useServiceWorker } from '@/hooks/useServiceWorker'
 import { analyzePhotoWithCache, calculateSmartPosition, getCachedAnalysis, clearAnalysisCache, setAnalysisDetectionMode } from '@/lib/face-detection'
 import { rankLayouts, suggestPhotoArrangement } from '@/lib/layout-scoring'
 import type { PhotoCharacteristics } from '@/lib/layout-scoring'
@@ -84,6 +89,8 @@ function App() {
   const { canUndo, canRedo, pushSnapshot, undo, redo, setRestoring, clear: clearHistory } = useCollageHistory()
   const { theme, setTheme, isDark } = useDarkMode()
   const { enabled: smartPositionEnabled, setEnabled: setSmartPositionEnabled, detectionMode, setDetectionMode } = useSmartPositioning()
+  const { isOnline } = useOnlineStatus()
+  const { needRefresh, updateSw, offlineReady } = useServiceWorker()
 
   const cycleTheme = useCallback(() => {
     const next = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'
@@ -516,6 +523,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-0 overflow-x-hidden">
+      <OfflineBanner isOnline={isOnline} offlineReady={offlineReady} />
+      <UpdateToast needRefresh={needRefresh} onRefresh={updateSw} />
       <Toaster position="top-right" />
       <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-8 max-w-7xl">
         <header className="mb-4 sm:mb-8">
@@ -534,6 +543,7 @@ function App() {
               </div>
             </div>
             <div className="flex items-center gap-1">
+              <InstallButton />
               <Button
                 variant="ghost"
                 size="sm"
