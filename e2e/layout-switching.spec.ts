@@ -27,7 +27,9 @@ test.describe('Layout Switching', () => {
 
     // Preview section must still be present after the layout change
     await expect(page.getByText('Preview')).toBeVisible()
-    await expect(page.getByRole('button', { name: /download/i })).toBeVisible()
+    const downloadBtn = page.getByRole('button', { name: /download/i })
+    const exportBtn = page.getByRole('button', { name: /export/i })
+    await expect(downloadBtn.or(exportBtn)).toBeVisible()
   })
 
   test('badge reflects both uploaded photos', async ({ page }) => {

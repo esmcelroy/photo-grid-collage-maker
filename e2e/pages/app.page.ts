@@ -133,10 +133,14 @@ export class AppPage {
 
   /**
    * Assert that the collage preview is visible and render-ready.
+   * On desktop the "Download" button is shown; on mobile "Export Collage" appears
+   * in a fixed bottom bar instead.
    */
   async assertPreviewVisible() {
     await expect(this.page.getByText('Preview')).toBeVisible()
-    await expect(this.page.getByRole('button', { name: /download/i })).toBeVisible()
+    const downloadBtn = this.page.getByRole('button', { name: /download/i })
+    const exportBtn = this.page.getByRole('button', { name: /export/i })
+    await expect(downloadBtn.or(exportBtn)).toBeVisible()
   }
 
   /**
