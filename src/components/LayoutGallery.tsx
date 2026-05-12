@@ -1,7 +1,6 @@
-import { useCallback, useState, useMemo } from 'react'
+import { useCallback, useState, useMemo, useRef } from 'react'
 import { GridLayout, PhotoPosition, SocialPlatform, UploadedPhoto } from '@/lib/types'
 import { LayoutOption } from './LayoutOption'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { GridFour, Shuffle, Columns, MagicWand, Lightning } from '@phosphor-icons/react'
@@ -62,6 +61,27 @@ export function LayoutGallery({
     } while (randomId === selectedLayoutId && filteredLayouts.length > 1)
     onLayoutSelect(randomId)
   }, [filteredLayouts, selectedLayoutId, onLayoutSelect])
+
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+
+    const container = scrollRef.current
+    if (!container) return
+
+    const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-label]'))
+    const currentIndex = buttons.findIndex(b => b === document.activeElement)
+    if (currentIndex === -1) return
+
+    e.preventDefault()
+    const nextIndex = e.key === 'ArrowRight'
+      ? Math.min(currentIndex + 1, buttons.length - 1)
+      : Math.max(currentIndex - 1, 0)
+
+    buttons[nextIndex].focus()
+    buttons[nextIndex].scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  }, [])
 
   if (layouts.length === 0) {
     return (
@@ -144,10 +164,15 @@ export function LayoutGallery({
         <div className="absolute right-0 top-0 bottom-1 w-8 bg-gradient-to-l from-card to-transparent pointer-events-none" aria-hidden="true" />
       </div>
 
-      <ScrollArea className="h-[400px] pr-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="relative">
+        <div
+          ref={scrollRef}
+          className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin snap-x snap-mandatory"
+          onKeyDown={handleKeyDown}
+          aria-label="Layout options"
+        >
           {filteredLayouts.map((layout) => (
-            <div key={layout.id} className="relative">
+            <div key={layout.id} className="relative shrink-0 snap-start" style={{ width: '130px' }}>
               <LayoutOption
                 layout={layout}
                 photos={photos}
@@ -170,7 +195,8 @@ export function LayoutGallery({
             </div>
           ))}
         </div>
-      </ScrollArea>
+        <div className="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-card to-transparent pointer-events-none" aria-hidden="true" />
+      </div>
     </div>
   )
 }

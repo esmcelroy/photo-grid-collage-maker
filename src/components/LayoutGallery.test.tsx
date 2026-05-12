@@ -1,14 +1,8 @@
-import React from 'react'
 import { jest } from '@jest/globals'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'jest-axe'
 import { LayoutGallery } from '@/components/LayoutGallery'
-
-// Radix ScrollArea doesn't work reliably in jsdom — render children directly
-jest.mock('@/components/ui/scroll-area', () => ({
-  ScrollArea: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}))
 
 const mockLayouts = [
   {
@@ -504,5 +498,138 @@ describe('LayoutGallery', () => {
     )
     const results = await axe(container)
     expect(results).toHaveNoViolations()
+  })
+
+  // ─── horizontal strip layout ──────────────────────────────────────────────
+
+  it('renders layout tiles in a horizontal flex container', () => {
+    const { container } = render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId={null}
+        onLayoutSelect={jest.fn()}
+      />
+    )
+    const scrollContainer = container.querySelector('[aria-label="Layout options"]')
+    expect(scrollContainer).toBeInTheDocument()
+    expect(scrollContainer).toHaveClass('flex')
+    expect(scrollContainer).toHaveClass('overflow-x-auto')
+  })
+
+  it('renders each layout tile with fixed 130px width', () => {
+    const { container } = render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId={null}
+        onLayoutSelect={jest.fn()}
+      />
+    )
+    const scrollContainer = container.querySelector('[aria-label="Layout options"]')
+    const tileWrappers = scrollContainer?.querySelectorAll(':scope > .shrink-0')
+    expect(tileWrappers).toHaveLength(3)
+    tileWrappers?.forEach(wrapper => {
+      expect(wrapper).toHaveStyle({ width: '130px' })
+    })
+  })
+
+  it('renders a right fade gradient on the scroll area', () => {
+    const { container } = render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId={null}
+        onLayoutSelect={jest.fn()}
+      />
+    )
+    const gradient = container.querySelector('[aria-hidden="true"].bg-gradient-to-l')
+    // There should be at least the one on the layout strip
+    expect(gradient).toBeInTheDocument()
+  })
+
+  it('moves focus to the next layout button on ArrowRight', async () => {
+    const user = userEvent.setup()
+    render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId={null}
+        onLayoutSelect={jest.fn()}
+      />
+    )
+
+    const firstButton = screen.getByRole('button', { name: 'Select Side by Side layout' })
+    const secondButton = screen.getByRole('button', { name: 'Select Stacked layout' })
+
+    firstButton.focus()
+    expect(firstButton).toHaveFocus()
+
+    await user.keyboard('{ArrowRight}')
+    expect(secondButton).toHaveFocus()
+  })
+
+  it('moves focus to the previous layout button on ArrowLeft', async () => {
+    const user = userEvent.setup()
+    render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId={null}
+        onLayoutSelect={jest.fn()}
+      />
+    )
+
+    const firstButton = screen.getByRole('button', { name: 'Select Side by Side layout' })
+    const secondButton = screen.getByRole('button', { name: 'Select Stacked layout' })
+
+    secondButton.focus()
+    expect(secondButton).toHaveFocus()
+
+    await user.keyboard('{ArrowLeft}')
+    expect(firstButton).toHaveFocus()
+  })
+
+  it('clamps keyboard navigation at the first element', async () => {
+    const user = userEvent.setup()
+    render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId={null}
+        onLayoutSelect={jest.fn()}
+      />
+    )
+
+    const firstButton = screen.getByRole('button', { name: 'Select Side by Side layout' })
+
+    firstButton.focus()
+    await user.keyboard('{ArrowLeft}')
+    expect(firstButton).toHaveFocus()
+  })
+
+  it('clamps keyboard navigation at the last element', async () => {
+    const user = userEvent.setup()
+    render(
+      <LayoutGallery {...defaultPanelProps}
+        layouts={mockLayouts}
+        photos={[]}
+        photoPositions={[]}
+        selectedLayoutId={null}
+        onLayoutSelect={jest.fn()}
+      />
+    )
+
+    const lastButton = screen.getByRole('button', { name: 'Select Diagonal layout' })
+
+    lastButton.focus()
+    await user.keyboard('{ArrowRight}')
+    expect(lastButton).toHaveFocus()
   })
 })
