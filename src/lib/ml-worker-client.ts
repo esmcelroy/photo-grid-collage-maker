@@ -236,8 +236,15 @@ export async function detectCombined(photoId: string, dataUrl: string): Promise<
 }
 
 async function dataUrlToImageBitmap(dataUrl: string): Promise<ImageBitmap> {
-  const response = await fetch(dataUrl)
-  const blob = await response.blob()
+  // Convert data URL to blob without fetch() to avoid CSP connect-src violations
+  const [header, base64] = dataUrl.split(',')
+  const mime = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg'
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  const blob = new Blob([bytes], { type: mime })
   return createImageBitmap(blob)
 }
 
