@@ -154,7 +154,12 @@ test.describe('Layout Enhancements', () => {
     await expect(page.getByText('Get Started')).toBeVisible()
     await expect(page.getByText('Upload', { exact: true })).toBeVisible()
     await expect(page.getByText('Customize', { exact: true })).toBeVisible()
-    await expect(page.getByText('Choose Layout')).toBeVisible()
+    // On mobile, "Choose Layout" is hidden and replaced with "Layout";
+    // both spans exist in the DOM — assert that at least one is visible.
+    const layoutStepVisible = await page.getByText('Choose Layout').isVisible()
+      .catch(() => false) || await page.getByText('Layout', { exact: true }).isVisible()
+      .catch(() => false)
+    expect(layoutStepVisible).toBe(true)
     await expect(page.getByText('Download', { exact: true })).toBeVisible()
   })
 
