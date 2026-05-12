@@ -49,31 +49,28 @@ export interface LayoutScore {
 }
 
 /**
- * Analyzes grid-template-areas to determine the shape of each slot.
- * Accounts for the layout's container aspect ratio when available.
- * Returns orientation classification for each unique area name.
+ * Compute the numeric aspect ratio for each slot in a layout.
+ * Parses grid template and areas to determine each slot's width/height ratio,
+ * accounting for the container's own aspect ratio.
  */
-export function analyzeSlotOrientations(layout: GridLayout): Map<string, PhotoOrientation> {
-  const slots = new Map<string, PhotoOrientation>()
+export function computeSlotAspectRatios(layout: GridLayout): Map<string, number> {
+  const result = new Map<string, number>()
   const rows = layout.areas
   const numRows = rows.length
   const numCols = rows[0]?.split(' ').length ?? 0
 
-  if (numRows === 0 || numCols === 0) return slots
+  if (numRows === 0 || numCols === 0) return result
 
-  // Parse container aspect ratio (width/height)
   let containerAR = 1
   if (layout.aspectRatio) {
     const [aw, ah] = layout.aspectRatio.split('/').map(Number)
     if (ah > 0) containerAR = aw / ah
   }
 
-  // Parse grid template to get row/col relative sizes
   const { rowSizes, colSizes } = parseGridSizes(layout.gridTemplate, numRows, numCols)
   const totalRowSize = rowSizes.reduce((a, b) => a + b, 0)
   const totalColSize = colSizes.reduce((a, b) => a + b, 0)
 
-  // Collect unique areas and their spans
   const areaInfo = new Map<string, { occupiedRows: Set<number>; occupiedCols: Set<number> }>()
 
   for (let r = 0; r < rows.length; r++) {
@@ -93,16 +90,88 @@ export function analyzeSlotOrientations(layout: GridLayout): Map<string, PhotoOr
   for (const [area, { occupiedRows, occupiedCols }] of areaInfo) {
     const slotRowFraction = [...occupiedRows].reduce((sum, r) => sum + rowSizes[r], 0) / totalRowSize
     const slotColFraction = [...occupiedCols].reduce((sum, c) => sum + colSizes[c], 0) / totalColSize
-
-    // Actual cell aspect ratio considering container shape
     const cellAR = (slotColFraction * containerAR) / slotRowFraction
+    result.set(area, cellAR)
+  }
 
+  return result
+}
+
+/**
+ * Analyzes grid-template-areas to determine the shape of each slot.
+ * Accounts for the layout's container aspect ratio when available.
+ * Returns orientation classification for each unique area name.
+ */
+export function analyzeSlotOrientations(layout: GridLayout): Map<string, PhotoOrientation> {
+  const slotARs = computeSlotAspectRatios(layout)
+  const slots = new Map<string, PhotoOrientation>()
+
+  for (const [area, cellAR] of slotARs) {
     if (cellAR > 1.2) slots.set(area, 'landscape')
     else if (cellAR < 0.8) slots.set(area, 'portrait')
     else slots.set(area, 'square')
   }
 
   return slots
+}
+
+/**
+ * Score how well photo aspect ratios fit the layout's slot aspect ratios.
+ * Uses sorted greedy matching for optimal assignment.
+ */
+export function scoreAspectRatioFit(
+  layout: GridLayout,
+  photos: PhotoCharacteristics[],
+): number {
+  const slotARs = computeSlotAspectRatios(layout)
+  if (slotARs.size === 0 || photos.length === 0) return 0
+
+  const sortedSlotARs = [...slotARs.values()].sort((a, b) => a - b)
+  const sortedPhotoARs = photos.map(p => p.aspectRatio).sort((a, b) => a - b)
+
+  // Match sorted lists (use min length if counts differ)
+  const matchCount = Math.min(sortedSlotARs.length, sortedPhotoARs.length)
+  let totalDistance = 0
+  for (let i = 0; i < matchCount; i++) {
+    totalDistance += Math.abs(sortedPhotoARs[i] - sortedSlotARs[i])
+  }
+
+  const avgDistance = totalDistance / matchCount
+
+  if (avgDistance < 0.3) return 15
+  if (avgDistance < 0.6) return 8
+  if (avgDistance < 1.0) return 0
+  return -10
+}
+
+/**
+ * Score how well the composition balance of photos matches the layout structure.
+ * Uniform photos suit grid layouts; varied photos suit hero layouts.
+ */
+export function scoreCompositionBalance(
+  layout: GridLayout,
+  photos: PhotoCharacteristics[],
+): number {
+  if (photos.length < 2) return 0
+
+  // Compute sharpness coefficient of variation
+  const sharpnesses = photos.map(p => p.sharpnessScore)
+  const sharpMean = sharpnesses.reduce((a, b) => a + b, 0) / sharpnesses.length
+  const sharpVariance = sharpnesses.reduce((sum, s) => sum + (s - sharpMean) ** 2, 0) / sharpnesses.length
+  const sharpCoV = Math.sqrt(sharpVariance) / Math.max(sharpMean, 1)
+
+  // Compute slot size coefficient of variation
+  const slotSizes = computeSlotSizes(layout.areas)
+  const slotFractions = [...slotSizes.values()]
+  const slotMean = slotFractions.reduce((a, b) => a + b, 0) / slotFractions.length
+  const slotVariance = slotFractions.reduce((sum, s) => sum + (s - slotMean) ** 2, 0) / slotFractions.length
+  const slotCoV = Math.sqrt(slotVariance) / Math.max(slotMean, 0.001)
+
+  if (sharpCoV < 0.3 && slotCoV < 0.1) return 10
+  if (sharpCoV > 0.5 && slotCoV > 0.3) return 10
+  if (sharpCoV < 0.3 && slotCoV > 0.3) return -8
+  if (sharpCoV > 0.5 && slotCoV < 0.1) return -5
+  return 0
 }
 
 /**
@@ -190,18 +259,11 @@ export function scoreLayout(
     }
   }
 
-  // 4. Layout aspect ratio vs photo set tendency (strongest signal)
-  if (layout.aspectRatio) {
-    const [aw, ah] = layout.aspectRatio.split('/').map(Number)
-    const layoutAR = aw / ah
-    const avgPhotoAR = photos.reduce((sum, p) => sum + p.aspectRatio, 0) / photos.length
-
-    if ((layoutAR > 1 && avgPhotoAR > 1) || (layoutAR < 1 && avgPhotoAR < 1)) {
-      score += 20
-      reasons.push('Aspect ratio alignment')
-    } else if ((layoutAR > 1 && avgPhotoAR < 1) || (layoutAR < 1 && avgPhotoAR > 1)) {
-      score -= 15
-    }
+  // 4. Per-slot aspect ratio fit
+  const arFitScore = scoreAspectRatioFit(layout, photos)
+  if (arFitScore !== 0) {
+    score += arFitScore
+    if (arFitScore > 0) reasons.push(arFitScore >= 15 ? 'Excellent AR fit' : 'Good AR fit')
   }
 
   // 5. Color harmony bonus/penalty (Phase 2)
@@ -219,6 +281,13 @@ export function scoreLayout(
       score += colorBonus
       if (colorBonus > 0) reasons.push('Color harmony')
     }
+  }
+
+  // 6. Composition balance
+  const compositionScore = scoreCompositionBalance(layout, photos)
+  if (compositionScore !== 0) {
+    score += compositionScore
+    if (compositionScore > 0) reasons.push('Composition balance')
   }
 
   return { layoutId: layout.id, score: Math.max(0, score), reasons }

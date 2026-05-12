@@ -5,6 +5,9 @@ import {
   rankLayouts,
   suggestPhotoArrangement,
   computeSlotSizes,
+  computeSlotAspectRatios,
+  scoreAspectRatioFit,
+  scoreCompositionBalance,
 } from './layout-scoring'
 import type { PhotoCharacteristics } from './layout-scoring'
 import type { GridLayout } from './types'
@@ -90,41 +93,51 @@ describe('scoreLayout', () => {
     { photoId: 'l2', orientation: 'landscape', aspectRatio: 1.33, sharpnessScore: 350 },
   ]
 
-  it('scores portrait-container layouts higher for portrait photos via aspect ratio alignment', () => {
-    const portraitLayout = makeLayout({
-      id: 'portrait-container',
+  it('scores layouts with matching slot ARs higher for portrait photos', () => {
+    // Layout where slots are actually portrait-shaped (narrow tall slots)
+    // Side-by-side in a square container: each slot AR = 0.5 → portrait
+    const matchingLayout = makeLayout({
+      id: 'portrait-slots',
+      gridTemplate: '1fr / 1fr 1fr',
+      areas: ['a b'],
+      aspectRatio: '1/1',
+    })
+    // Layout where slots are landscape-shaped
+    // Stacked in a wide container: each slot AR = 2.0 → landscape
+    const mismatchLayout = makeLayout({
+      id: 'landscape-slots',
       gridTemplate: '1fr 1fr / 1fr',
       areas: ['a', 'b'],
-      aspectRatio: '3/4',
-    })
-    const landscapeLayout = makeLayout({
-      id: 'landscape-container',
-      gridTemplate: '1fr 1fr',
-      areas: ['a b'],
-      aspectRatio: '16/9',
+      aspectRatio: '4/1',
     })
 
-    const portraitScore = scoreLayout(portraitLayout, portraitPhotos)
-    const landscapeScore = scoreLayout(landscapeLayout, portraitPhotos)
+    const portraitScore = scoreLayout(matchingLayout, portraitPhotos)
+    const landscapeScore = scoreLayout(mismatchLayout, portraitPhotos)
     expect(portraitScore.score).toBeGreaterThan(landscapeScore.score)
   })
 
-  it('scores landscape-container layouts higher for landscape photos', () => {
-    const landscapeLayout = makeLayout({
-      id: 'landscape-container',
-      gridTemplate: '1fr 1fr',
+  it('scores layouts with matching slot ARs higher for landscape photos', () => {
+    // Layout where slots are landscape-shaped
+    // Stacked rows in a wide container: each slot AR = (1 * 4) / 0.5 = 8 → very landscape
+    // Actually let's use a more reasonable: stacked in 3/1 container → slot AR = (1*3)/0.5 = 6... too extreme
+    // Single row, 2 cols in wide container: each slot AR = 0.5 * 4 = 2 → landscape
+    const matchingLayout = makeLayout({
+      id: 'landscape-slots',
+      gridTemplate: '1fr / 1fr 1fr',
       areas: ['a b'],
-      aspectRatio: '16/9',
+      aspectRatio: '4/1',
     })
-    const portraitLayout = makeLayout({
-      id: 'portrait-container',
-      gridTemplate: '1fr 1fr / 1fr',
-      areas: ['a', 'b'],
-      aspectRatio: '3/4',
+    // Layout where slots are portrait-shaped
+    // Side-by-side in narrow container: each slot AR = 0.5 * 0.5 = 0.25 → portrait
+    const mismatchLayout = makeLayout({
+      id: 'portrait-slots',
+      gridTemplate: '1fr / 1fr 1fr',
+      areas: ['a b'],
+      aspectRatio: '1/2',
     })
 
-    const landscapeScore = scoreLayout(landscapeLayout, landscapePhotos)
-    const portraitScore = scoreLayout(portraitLayout, landscapePhotos)
+    const landscapeScore = scoreLayout(matchingLayout, landscapePhotos)
+    const portraitScore = scoreLayout(mismatchLayout, landscapePhotos)
     expect(landscapeScore.score).toBeGreaterThan(portraitScore.score)
   })
 
@@ -409,5 +422,223 @@ describe('scoreLayout hero bonus scaling', () => {
     const sharpResult = scoreLayout(heroLayout, sharpPhotos)
     const lessSharpResult = scoreLayout(heroLayout, lessSharpPhotos)
     expect(sharpResult.score).toBeGreaterThan(lessSharpResult.score)
+  })
+})
+
+describe('computeSlotAspectRatios', () => {
+  it('returns numeric ARs for a layout with mixed slot shapes (hero + small)', () => {
+    const layout = makeLayout({
+      id: 'hero-mixed',
+      gridTemplate: '1fr 1fr / 2fr 1fr',
+      areas: ['a b', 'a c'],
+      aspectRatio: '4/3',
+    })
+    const ars = computeSlotAspectRatios(layout)
+    expect(ars.size).toBe(3)
+    // 'a' spans 2 rows, col fraction 2/3, row fraction 2/2
+    // cellAR = (2/3 * 4/3) / (2/2) = 0.889
+    const arA = ars.get('a')!
+    expect(arA).toBeGreaterThan(0.5)
+    expect(arA).toBeLessThan(1.5)
+    // 'b' and 'c' each span 1 row, col fraction 1/3
+    // cellAR = (1/3 * 4/3) / (1/2) = 0.889
+    const arB = ars.get('b')!
+    const arC = ars.get('c')!
+    expect(arB).toBeGreaterThan(0)
+    expect(arC).toBeGreaterThan(0)
+  })
+
+  it('returns ARs near 1.0 for all slots in a square layout', () => {
+    const layout = makeLayout({
+      id: 'square-grid',
+      gridTemplate: '1fr 1fr / 1fr 1fr',
+      areas: ['a b', 'c d'],
+      aspectRatio: '1/1',
+    })
+    const ars = computeSlotAspectRatios(layout)
+    for (const [, ar] of ars) {
+      expect(ar).toBeCloseTo(1.0, 1)
+    }
+  })
+
+  it('returns ARs < 1.0 for a portrait layout', () => {
+    // Single column, 2 rows, in a narrow portrait container
+    // Each slot: rowFrac=0.5, colFrac=1, AR = (1 * 0.5) / 0.5 = 0.5
+    const layout = makeLayout({
+      id: 'portrait-grid',
+      gridTemplate: '1fr 1fr / 1fr',
+      areas: ['a', 'b'],
+      aspectRatio: '1/4',
+    })
+    const ars = computeSlotAspectRatios(layout)
+    for (const [, ar] of ars) {
+      expect(ar).toBeLessThan(1.0)
+    }
+  })
+})
+
+describe('scoreAspectRatioFit', () => {
+  it('returns +15 for all landscape photos + all landscape slots', () => {
+    // Very wide container: each slot AR = 0.5 * (32/9) / 1 = 1.778 → landscape
+    const layout = makeLayout({
+      id: 'landscape-layout',
+      gridTemplate: '1fr / 1fr 1fr',
+      areas: ['a b'],
+      aspectRatio: '32/9',
+    })
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 'l1', orientation: 'landscape', aspectRatio: 1.78, sharpnessScore: 200 },
+      { photoId: 'l2', orientation: 'landscape', aspectRatio: 1.5, sharpnessScore: 200 },
+    ]
+    const score = scoreAspectRatioFit(layout, photos)
+    expect(score).toBe(15)
+  })
+
+  it('returns +8 or +15 for mixed orientations that match slots well', () => {
+    // Hero layout: 'a' is roughly square, 'b' and 'c' are landscape-ish
+    const layout = makeLayout({
+      id: 'mixed-layout',
+      gridTemplate: '1fr 1fr / 2fr 1fr',
+      areas: ['a b', 'a c'],
+      aspectRatio: '4/3',
+    })
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 'p1', orientation: 'square', aspectRatio: 0.9, sharpnessScore: 200 },
+      { photoId: 'p2', orientation: 'square', aspectRatio: 0.85, sharpnessScore: 200 },
+      { photoId: 'p3', orientation: 'square', aspectRatio: 0.95, sharpnessScore: 200 },
+    ]
+    const score = scoreAspectRatioFit(layout, photos)
+    expect(score).toBeGreaterThanOrEqual(8)
+  })
+
+  it('returns -10 for all portrait photos in all landscape slots', () => {
+    const layout = makeLayout({
+      id: 'wide-landscape',
+      gridTemplate: '1fr / 1fr 1fr',
+      areas: ['a b'],
+      aspectRatio: '32/9',
+    })
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 'p1', orientation: 'portrait', aspectRatio: 0.5, sharpnessScore: 200 },
+      { photoId: 'p2', orientation: 'portrait', aspectRatio: 0.6, sharpnessScore: 200 },
+    ]
+    const score = scoreAspectRatioFit(layout, photos)
+    expect(score).toBe(-10)
+  })
+
+  it('returns a reasonable score for single photo + single slot', () => {
+    const layout = makeLayout({
+      id: 'single',
+      gridTemplate: '1fr / 1fr',
+      areas: ['a'],
+      aspectRatio: '1/1',
+    })
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 'p1', orientation: 'square', aspectRatio: 1.0, sharpnessScore: 200 },
+    ]
+    const score = scoreAspectRatioFit(layout, photos)
+    expect(score).toBe(15) // exact match → excellent
+  })
+})
+
+describe('scoreCompositionBalance', () => {
+  it('returns +10 for uniform sharpness + equal-size grid', () => {
+    const layout = makeLayout({
+      id: 'equal-grid',
+      gridTemplate: '1fr 1fr / 1fr 1fr',
+      areas: ['a b', 'c d'],
+      aspectRatio: '1/1',
+    })
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 'p1', orientation: 'square', aspectRatio: 1, sharpnessScore: 200 },
+      { photoId: 'p2', orientation: 'square', aspectRatio: 1, sharpnessScore: 190 },
+      { photoId: 'p3', orientation: 'square', aspectRatio: 1, sharpnessScore: 210 },
+      { photoId: 'p4', orientation: 'square', aspectRatio: 1, sharpnessScore: 195 },
+    ]
+    const score = scoreCompositionBalance(layout, photos)
+    expect(score).toBe(10)
+  })
+
+  it('returns +10 for one very sharp + rest blurry + hero layout', () => {
+    const layout = makeLayout({
+      id: 'hero-layout',
+      gridTemplate: '1fr 1fr / 2fr 1fr',
+      areas: ['a b', 'a c'],
+      aspectRatio: '4/3',
+    })
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 'p1', orientation: 'square', aspectRatio: 1, sharpnessScore: 300 },
+      { photoId: 'p2', orientation: 'square', aspectRatio: 1, sharpnessScore: 50 },
+      { photoId: 'p3', orientation: 'square', aspectRatio: 1, sharpnessScore: 50 },
+    ]
+    const score = scoreCompositionBalance(layout, photos)
+    expect(score).toBe(10)
+  })
+
+  it('returns -8 for uniform sharpness + hero layout (mismatch)', () => {
+    const layout = makeLayout({
+      id: 'hero-layout',
+      gridTemplate: '1fr 1fr / 2fr 1fr',
+      areas: ['a b', 'a c'],
+      aspectRatio: '4/3',
+    })
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 'p1', orientation: 'square', aspectRatio: 1, sharpnessScore: 200 },
+      { photoId: 'p2', orientation: 'square', aspectRatio: 1, sharpnessScore: 200 },
+      { photoId: 'p3', orientation: 'square', aspectRatio: 1, sharpnessScore: 200 },
+    ]
+    const score = scoreCompositionBalance(layout, photos)
+    expect(score).toBe(-8)
+  })
+
+  it('returns -5 for varied sharpness + equal grid (mismatch)', () => {
+    const layout = makeLayout({
+      id: 'equal-grid',
+      gridTemplate: '1fr 1fr / 1fr 1fr',
+      areas: ['a b', 'c d'],
+      aspectRatio: '1/1',
+    })
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 'p1', orientation: 'square', aspectRatio: 1, sharpnessScore: 300 },
+      { photoId: 'p2', orientation: 'square', aspectRatio: 1, sharpnessScore: 50 },
+      { photoId: 'p3', orientation: 'square', aspectRatio: 1, sharpnessScore: 50 },
+      { photoId: 'p4', orientation: 'square', aspectRatio: 1, sharpnessScore: 50 },
+    ]
+    const score = scoreCompositionBalance(layout, photos)
+    expect(score).toBe(-5)
+  })
+})
+
+describe('scoreLayout updated factors', () => {
+  it('does not produce "Aspect ratio alignment" reason (old binary check removed)', () => {
+    const layout = makeLayout({
+      id: 'portrait-container',
+      gridTemplate: '1fr 1fr / 1fr',
+      areas: ['a', 'b'],
+      aspectRatio: '3/4',
+    })
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 'p1', orientation: 'portrait', aspectRatio: 0.75, sharpnessScore: 200 },
+      { photoId: 'p2', orientation: 'portrait', aspectRatio: 0.67, sharpnessScore: 150 },
+    ]
+    const result = scoreLayout(layout, photos)
+    expect(result.reasons).not.toContain('Aspect ratio alignment')
+  })
+
+  it('includes "Composition balance" reason when appropriate', () => {
+    const layout = makeLayout({
+      id: 'equal-grid',
+      gridTemplate: '1fr 1fr / 1fr 1fr',
+      areas: ['a b', 'c d'],
+      aspectRatio: '1/1',
+    })
+    const photos: PhotoCharacteristics[] = [
+      { photoId: 'p1', orientation: 'square', aspectRatio: 1, sharpnessScore: 200 },
+      { photoId: 'p2', orientation: 'square', aspectRatio: 1, sharpnessScore: 190 },
+      { photoId: 'p3', orientation: 'square', aspectRatio: 1, sharpnessScore: 210 },
+      { photoId: 'p4', orientation: 'square', aspectRatio: 1, sharpnessScore: 195 },
+    ]
+    const result = scoreLayout(layout, photos)
+    expect(result.reasons).toContain('Composition balance')
   })
 })
