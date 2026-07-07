@@ -188,3 +188,14 @@ jobs:
       - name: Fail job if UI tests failed
         if: steps.ui-test-script.outputs.exists == 'true' && steps.ui-tests.outcome == 'failure'
         run: exit 1
+  
+  build-analyze:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+          with:
+            fetch-depth: 0 
+        - uses: SonarSource/sonarqube-scan-action@v6.0.0
+          env:
+            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+            SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
