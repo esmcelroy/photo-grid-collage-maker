@@ -190,15 +190,12 @@ jobs:
         run: exit 1
   
   build-analyze:
-    steps:
-      - name: Build and analyze
-        runs-on: ubuntu-latest
-        
-        steps:
-          - uses: actions/checkout@v4
-            with:
-              fetch-depth: 0 
-          - uses: SonarSource/sonarqube-scan-action@v6.0.0
-            env:
-              SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-              SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+          with:
+            fetch-depth: 0 
+        - uses: SonarSource/sonarqube-scan-action@v6.0.0
+          env:
+            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+            SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
