@@ -1,0 +1,13 @@
+[mcp_servers.playwright]
+command = "npx"
+args = ["-y", "@playwright/mcp@0.0.78"]
+
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = [
+    "-y",
+    "chrome-devtools-mcp@1.6.0",
+    "--chromeArg=--disable-features=PasswordLeakDetection,PasswordCheck",
+    "--chromeArg=--no-default-browser-check",
+    "--chromeArg=--disable-sync",
+]
