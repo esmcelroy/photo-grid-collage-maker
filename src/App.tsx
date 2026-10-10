@@ -45,6 +45,14 @@ function initializePositions(layout: GridLayout, photosArray: UploadedPhoto[]): 
   }))
 }
 
+function getLayoutAspectRatio(layout: GridLayout | null): number {
+  if (!layout) return 1
+  const value = layout.aspectRatio ?? 1
+  if (typeof value === 'number') return value
+  const [width, height] = value.split('/').map(Number)
+  return Number.isFinite(width) && Number.isFinite(height) && height > 0 ? width / height : 1
+}
+
 function CollapsibleSection({ title, defaultOpen = true, headerAction, children }: {
   title: string
   defaultOpen?: boolean
@@ -383,7 +391,7 @@ function App() {
   const handleDownload = async (options: ExportOptions) => {
     if (!previewRef.current || !selectedLayout) {
       toast.error('No collage to download')
-      return
+      throw new Error('No collage is available to download.')
     }
 
     try {
@@ -392,12 +400,15 @@ function App() {
         previewRef.current,
         options.filename,
         options.format,
-        options.quality
+        options.quality,
+        options.width,
+        options.height
       )
       toast.success('Collage downloaded successfully!')
     } catch (error) {
       toast.error('Failed to download collage')
       console.error(error)
+      throw error
     }
   }
 
@@ -643,6 +654,7 @@ function App() {
                     <ExportDialog
                       onExport={handleDownload}
                       disabled={!selectedLayout}
+                      aspectRatio={getLayoutAspectRatio(selectedLayout)}
                     />
                   </div>
                 </div>
@@ -824,6 +836,7 @@ function App() {
           <ExportDialog
             onExport={handleDownload}
             disabled={!selectedLayout}
+            aspectRatio={getLayoutAspectRatio(selectedLayout)}
             trigger={
               <Button className="w-full min-h-[44px]" size="lg">
                 <DownloadSimple className="w-5 h-5 mr-2" weight="bold" />

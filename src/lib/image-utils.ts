@@ -1,3 +1,5 @@
+import { validateExportDimensions } from '@/lib/export-dimensions'
+
 export async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -223,10 +225,15 @@ export function replaceOklchInSubtree(root: HTMLElement): () => void {
 /* istanbul ignore next -- html2canvas requires a real browser; covered by Playwright e2e */
 export async function downloadCollage(
   canvasElement: HTMLElement,
-  filename: string = 'collage.png',
-  format: 'png' | 'jpeg' = 'png',
-  quality: number = 1.0
+  filename: string,
+  format: 'png' | 'jpeg',
+  quality: number,
+  width: number,
+  height: number
 ): Promise<void> {
+  const dimensionError = validateExportDimensions(width, height)
+  if (dimensionError) throw new Error(dimensionError)
+
   const html2canvas = (await import('html2canvas')).default
 
   // Convert oklch/oklab colors before html2canvas processes the DOM
@@ -235,7 +242,7 @@ export async function downloadCollage(
   const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png'
 
   try {
-    const canvas = await html2canvas(canvasElement, {
+    const sourceCanvas = await html2canvas(canvasElement, {
       scale: 3,
       useCORS: true,
       allowTaint: true,
@@ -266,17 +273,30 @@ export async function downloadCollage(
       },
     })
 
-    canvas.toBlob((blob) => {
-      if (!blob) return
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Could not create an export canvas.')
+    context.drawImage(sourceCanvas, 0, 0, width, height)
 
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = filename
-      link.click()
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((result) => {
+        if (result) {
+          resolve(result)
+        } else {
+          reject(new Error('Browser could not encode the collage image.'))
+        }
+      }, mimeType, quality)
+    })
 
-      URL.revokeObjectURL(url)
-    }, mimeType, quality)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
   } finally {
     restore()
   }

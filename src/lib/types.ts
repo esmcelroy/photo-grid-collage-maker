@@ -38,6 +38,8 @@ export interface ExportOptions {
   format: ExportFormat
   quality: number // 0.0–1.0, only used for JPEG
   filename: string
+  width: number
+  height: number
 }
 
 export interface CollageState {
