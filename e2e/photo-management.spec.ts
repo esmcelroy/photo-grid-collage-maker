@@ -30,8 +30,7 @@ test.describe('Photo Management', () => {
     await expect(page.getByText('Your Photos')).toBeVisible()
     const previousSessionId = await page.evaluate(() => localStorage.getItem('collage-session-id'))
 
-    await page.getByRole('button', { name: /clear all/i }).click()
-    await page.getByRole('button', { name: 'Clear all photos' }).click()
+    await app.clearAll()
 
     // Empty state should be restored
     await expect(page.getByText(/upload photos/i)).toBeVisible()

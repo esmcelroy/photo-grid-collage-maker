@@ -158,6 +158,7 @@ function App() {
   }, [photoPositions])
 
   const cancelPendingAutoPosition = useCallback(() => {
+    positionRevisionRef.current += 1
     completedAutoPositionRequestRef.current = autoPositionRequest
   }, [autoPositionRequest])
 
@@ -407,6 +408,7 @@ function App() {
   }, [photos.length, collageId, addPhoto])
 
   const handleRemovePhoto = useCallback(async (photoId: string) => {
+    cancelPendingAutoPosition()
     try {
       await removePhoto(photoId)
       toast.success('Photo removed')
@@ -414,7 +416,7 @@ function App() {
       toast.error('Failed to remove photo')
       console.error(error)
     }
-  }, [removePhoto])
+  }, [removePhoto, cancelPendingAutoPosition])
 
   const handleSettingsChange = useCallback((newSettings: CollageSettings) => {
     pushSnapshot(getCurrentSnapshot())
@@ -429,23 +431,26 @@ function App() {
   const handleLayoutSelect = useCallback(async (layoutId: string) => {
     const layout = availableLayouts.find(l => l.id === layoutId)
     if (!layout) return
+    cancelPendingAutoPosition()
     pushSnapshot(getCurrentSnapshot())
     const newPositions = initializePositions(layout, photos)
     await updateLayout(layoutId, newPositions)
     toast.success(`Layout changed to ${layout.name}`)
-  }, [availableLayouts, photos, updateLayout, pushSnapshot, getCurrentSnapshot])
+  }, [availableLayouts, photos, updateLayout, pushSnapshot, getCurrentSnapshot, cancelPendingAutoPosition])
 
   const handleArrangementApply = useCallback(async (layoutId: string, positions: PhotoPosition[]) => {
     const layout = availableLayouts.find(l => l.id === layoutId)
     if (!layout) return
+    cancelPendingAutoPosition()
     pushSnapshot(getCurrentSnapshot())
     await updateLayout(layoutId, positions)
     setShowCarousel(false)
     toast.success(`Applied ${layout.name} arrangement`)
-  }, [availableLayouts, updateLayout, pushSnapshot, getCurrentSnapshot])
+  }, [availableLayouts, updateLayout, pushSnapshot, getCurrentSnapshot, cancelPendingAutoPosition])
 
   const handleAutoLayout = useCallback(async () => {
     if (rankedLayouts.length === 0 || photos.length === 0) return
+    cancelPendingAutoPosition()
     const bestLayout = rankedLayouts[0]
     pushSnapshot(getCurrentSnapshot())
 
@@ -473,7 +478,7 @@ function App() {
 
     await updateLayout(bestLayout.id, positions)
     toast.success(`Auto-applied ${bestLayout.name} with optimized arrangement`)
-  }, [rankedLayouts, photos, updateLayout, pushSnapshot, getCurrentSnapshot])
+  }, [rankedLayouts, photos, updateLayout, pushSnapshot, getCurrentSnapshot, cancelPendingAutoPosition])
 
   const handleDownload = async (options: ExportOptions) => {
     if (!previewRef.current || !selectedLayout) {
@@ -500,6 +505,7 @@ function App() {
   }
 
   const handleClearAll = async () => {
+    cancelPendingAutoPosition()
     try {
       if (settingsTimerRef.current) {
         clearTimeout(settingsTimerRef.current)
@@ -534,6 +540,7 @@ function App() {
   const handleUndo = useCallback(async () => {
     const snapshot = undo(getCurrentSnapshot())
     if (!snapshot) return
+    cancelPendingAutoPosition()
     setRestoring(true)
     try {
       if (snapshot.selectedLayoutId) {
@@ -543,11 +550,12 @@ function App() {
     } finally {
       setRestoring(false)
     }
-  }, [undo, getCurrentSnapshot, setRestoring, updateLayout, updateSettings])
+  }, [undo, getCurrentSnapshot, setRestoring, updateLayout, updateSettings, cancelPendingAutoPosition])
 
   const handleRedo = useCallback(async () => {
     const snapshot = redo(getCurrentSnapshot())
     if (!snapshot) return
+    cancelPendingAutoPosition()
     setRestoring(true)
     try {
       if (snapshot.selectedLayoutId) {
@@ -557,7 +565,7 @@ function App() {
     } finally {
       setRestoring(false)
     }
-  }, [redo, getCurrentSnapshot, setRestoring, updateLayout, updateSettings])
+  }, [redo, getCurrentSnapshot, setRestoring, updateLayout, updateSettings, cancelPendingAutoPosition])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -598,7 +606,7 @@ function App() {
       const results = await Promise.allSettled(
         photos.map(p => analyzePhotoWithCache(p.id, p.dataUrl))
       )
-      if (cancelled || positionRevisionRef.current !== positionRevision) return
+      if (cancelled) return
 
       const analyses = results
         .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof analyzePhotoWithCache>>> => r.status === 'fulfilled')
@@ -615,7 +623,7 @@ function App() {
       })
 
       const changed = updatedPositions.some((p, i) => p.objectPosition !== photoPositions[i].objectPosition)
-      if (shouldApplyPositions && changed && !cancelled) {
+      if (shouldApplyPositions && changed && positionRevisionRef.current === positionRevision) {
         try {
           await updatePositions(updatedPositions)
         } catch {

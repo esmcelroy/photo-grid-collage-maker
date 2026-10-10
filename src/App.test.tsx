@@ -161,16 +161,15 @@ describe('smart positioning integration', () => {
     expect(updatePositions).toHaveBeenCalledTimes(1)
   })
 
-  it('does not overwrite a manual crop made while analysis is pending', async () => {
+  it('does not overwrite a manual crop before its save completes while analysis is pending', async () => {
     const pending = deferred<PhotoAnalysis>()
     analyzePhotoWithCache.mockReturnValue(pending.promise)
     const view = render(<App />)
     await enableSmartPositioning(view)
     await waitFor(() => expect(analyzePhotoWithCache).toHaveBeenCalledTimes(1))
 
+    updatePositions.mockReturnValueOnce(new Promise(() => {}))
     fireEvent.click(screen.getByRole('button', { name: 'Manual crop' }))
-    collageState = { ...collageState, photoPositions: [{ photoId: 'photo-1', gridArea: 'a', objectPosition: '10% 20%' }] }
-    view.rerender(<App />)
     await act(async () => { pending.resolve(analysis('photo-1')) })
 
     expect(updatePositions).toHaveBeenCalledTimes(1)

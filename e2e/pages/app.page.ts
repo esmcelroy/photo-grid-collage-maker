@@ -195,6 +195,17 @@ export class AppPage {
     return fs.existsSync(screenshotPath)
   }
 
+  async capturePreview(): Promise<Buffer> {
+    await this.page.mouse.move(0, 0)
+    return this.page.locator('[data-grid-area]').first().locator('..').screenshot()
+  }
+
+  async clearAll() {
+    await this.page.getByRole('button', { name: 'Clear All', exact: true }).click()
+    await this.page.getByRole('button', { name: 'Clear all photos', exact: true }).click()
+    await expect(this.page.getByText('Upload Photos', { exact: true })).toBeVisible()
+  }
+
   async exportExactDimensions(width: number, height: number): Promise<Download> {
     await this.page.getByRole('button', { name: /download|export collage/i }).click()
     await expect(this.page.getByRole('heading', { name: 'Export Collage' })).toBeVisible()
