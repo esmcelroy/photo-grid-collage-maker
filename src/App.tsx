@@ -121,9 +121,28 @@ function App() {
   const [selectedLayout, setSelectedLayout] = useState<GridLayout | null>(null)
   const [showCarousel, setShowCarousel] = useState(false)
   const [compareIds, setCompareIds] = useState<string[]>([])
-  const [analysisVersion, setAnalysisVersion] = useState(0)
+  const [analysisResultsVersion, setAnalysisResultsVersion] = useState(0)
   const [workerStatus, setWorkerStatus] = useState<WorkerStatus>(getWorkerStatus)
+  const [autoPositionRequest, setAutoPositionRequest] = useState(0)
+  const positionRevisionRef = useRef(0)
+  const completedAutoPositionRequestRef = useRef(0)
   const isComparing = compareIds.length > 0
+
+  // A completed analysis must never apply to positions that the user changed
+  // while the asynchronous work was in flight.
+  useEffect(() => {
+    positionRevisionRef.current += 1
+  }, [photoPositions])
+
+  const cancelPendingAutoPosition = useCallback(() => {
+    completedAutoPositionRequestRef.current = autoPositionRequest
+  }, [autoPositionRequest])
+
+  const handleSmartPositionToggle = useCallback(() => {
+    const nextEnabled = !smartPositionEnabled
+    setSmartPositionEnabled(nextEnabled)
+    if (nextEnabled) setAutoPositionRequest(request => request + 1)
+  }, [setSmartPositionEnabled, smartPositionEnabled])
 
   // Track ML worker status changes
   useEffect(() => {
@@ -161,7 +180,7 @@ function App() {
     if (prevDetectionMode.current !== detectionMode) {
       prevDetectionMode.current = detectionMode
       clearAnalysisCache()
-      setAnalysisVersion(v => v + 1)
+      setAnalysisResultsVersion(v => v + 1)
     }
   }, [detectionMode])
 
@@ -194,7 +213,7 @@ function App() {
     const ranked = rankLayouts(availableLayouts, characteristics)
     return ranked.map(r => availableLayouts.find(l => l.id === r.layoutId)!).filter(Boolean)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableLayouts, photos, analysisVersion])
+  }, [availableLayouts, photos, analysisResultsVersion])
 
   // The top-ranked layout gets a "Recommended" badge (only when analysis data exists)
   const recommendedLayoutId = useMemo(() => {
@@ -205,7 +224,7 @@ function App() {
     })
     return hasAnalysis ? rankedLayouts[0]?.id ?? null : null
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rankedLayouts, photos, analysisVersion])
+  }, [rankedLayouts, photos, analysisResultsVersion])
 
   // Aggregate dominant colors from all analyzed photos for background suggestions
   const allPhotoColors: DominantColor[] = useMemo(() => {
@@ -219,7 +238,7 @@ function App() {
     }
     return colors
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photos, analysisVersion])
+  }, [photos, analysisResultsVersion])
 
   const handleToggleCarousel = useCallback(() => {
     setShowCarousel(prev => {
@@ -423,6 +442,7 @@ function App() {
   }
 
   const handleApplyEdit = async (updatedPosition: PhotoPosition) => {
+    cancelPendingAutoPosition()
     pushSnapshot(getCurrentSnapshot())
     const newPositions = photoPositions.map(p =>
       p.gridArea === updatedPosition.gridArea ? updatedPosition : p
@@ -478,19 +498,30 @@ function App() {
     return () => window.removeEventListener('keydown', handler)
   }, [handleUndo, handleRedo])
 
-  // Auto-apply smart positions when enabled and layout changes
+  const photoInputKey = useMemo(
+    () => photos.map(photo => `${photo.id}:${photo.dataUrl}`).join('|'),
+    [photos]
+  )
+
+  // Auto-apply only for explicit smart-position triggers. Completion updates
+  // ranking/color suggestions, but is deliberately not an analysis trigger.
   useEffect(() => {
     if (!smartPositionEnabled || !selectedLayout || photos.length === 0) return
+
+    const needsWorker = detectionMode === 'advanced' || (detectionMode === 'standard' && !hasNativeFaceDetector())
+    if (needsWorker && workerStatus !== 'ready') return
 
     // Sync detection mode to analysis pipeline before running
     setAnalysisDetectionMode(detectionMode)
 
     let cancelled = false
+    const positionRevision = positionRevisionRef.current
+    const shouldApplyPositions = autoPositionRequest > completedAutoPositionRequestRef.current
     async function applySmartPositions() {
       const results = await Promise.allSettled(
         photos.map(p => analyzePhotoWithCache(p.id, p.dataUrl))
       )
-      if (cancelled) return
+      if (cancelled || positionRevisionRef.current !== positionRevision) return
 
       const analyses = results
         .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof analyzePhotoWithCache>>> => r.status === 'fulfilled')
@@ -507,17 +538,30 @@ function App() {
       })
 
       const changed = updatedPositions.some((p, i) => p.objectPosition !== photoPositions[i].objectPosition)
-      if (changed && !cancelled) {
-        void updatePositions(updatedPositions).catch(() => {})
+      if (shouldApplyPositions && changed && !cancelled) {
+        try {
+          await updatePositions(updatedPositions)
+        } catch {
+          if (!cancelled && positionRevisionRef.current === positionRevision) {
+            toast.error('Failed to apply smart photo positions')
+          }
+        }
       }
-      // Bump analysis version so ranking/color memos re-evaluate
-      if (!cancelled) setAnalysisVersion(v => v + 1)
+      if (shouldApplyPositions && !cancelled && positionRevisionRef.current === positionRevision) {
+        completedAutoPositionRequestRef.current = autoPositionRequest
+      }
+      // Completion notifies ranking and color suggestions without restarting analysis.
+      if (!cancelled) {
+        setAnalysisResultsVersion(v => v + 1)
+      }
     }
 
     applySmartPositions()
     return () => { cancelled = true }
+    // photoPositions is intentionally excluded: changes invalidate the request
+    // through positionRevisionRef but must not reapply smart positioning.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [smartPositionEnabled, selectedLayoutId, photos.length, detectionMode, analysisVersion])
+  }, [autoPositionRequest, collageId, detectionMode, photoInputKey, selectedLayout, smartPositionEnabled, workerStatus])
 
   // Derived state for edit dialog
   const editingPosition = editingArea
@@ -696,6 +740,7 @@ function App() {
                   photoPositions={photoPositions}
                   settings={settings}
                   onPositionsChange={(nextPositions) => {
+                    cancelPendingAutoPosition()
                     pushSnapshot(getCurrentSnapshot())
                     void updatePositions(nextPositions).catch(() => {
                       toast.error('Failed to update photo positions')
@@ -745,8 +790,9 @@ function App() {
                     </div>
                     <button
                       role="switch"
+                      aria-label="Smart positioning"
                       aria-checked={smartPositionEnabled}
-                      onClick={() => setSmartPositionEnabled(!smartPositionEnabled)}
+                      onClick={handleSmartPositionToggle}
                       className={cn(
                         "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
                         smartPositionEnabled ? "bg-primary" : "bg-muted-foreground/30"
@@ -760,6 +806,9 @@ function App() {
                       />
                     </button>
                   </div>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Turning this on applies automatic positioning to the current layout. Manual edits remain unchanged until you turn Smart Position off and on again.
+                  </p>
                   <CustomizationControls
                     settings={settings}
                     onSettingsChange={handleSettingsChange}

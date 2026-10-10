@@ -141,6 +141,16 @@ describe('analyzePhotoWithCache', () => {
     expect(result1.photoId).toBe('photo-a')
     expect(result2.photoId).toBe('photo-b')
   })
+
+  it('does not reuse an analysis after the photo data changes', async () => {
+    mockImageLoad(100, 100)
+    mockGetImageData.mockReturnValue(createMockImageData(100, 100) as unknown as ImageData)
+
+    const first = await analyzePhotoWithCache('photo-a', 'data:image/png;base64,first')
+    const second = await analyzePhotoWithCache('photo-a', 'data:image/png;base64,second')
+
+    expect(second).not.toBe(first)
+  })
 })
 
 describe('clearAnalysisCache', () => {
