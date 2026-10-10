@@ -137,4 +137,15 @@ describe('processFilesForHeic', () => {
     expect(progress).toHaveBeenCalledWith(1, 2, 'a.heic')
     expect(progress).toHaveBeenCalledWith(2, 2, 'b.heic')
   })
+
+  it('excludes a HEIC file when conversion fails', async () => {
+    const jpg = new File(['data'], 'photo.jpg', { type: 'image/jpeg' })
+    const invalidHeic = createHeicFile('broken.heic')
+    HTMLCanvasElement.prototype.getContext = jest.fn().mockReturnValue(null) as unknown as typeof HTMLCanvasElement.prototype.getContext
+
+    const { converted, errors } = await processFilesForHeic([jpg, invalidHeic])
+
+    expect(converted).toEqual([jpg])
+    expect(errors).toEqual([expect.objectContaining({ fileName: 'broken.heic' })])
+  })
 })

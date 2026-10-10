@@ -22,6 +22,16 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Toaster } from '@/components/ui/sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Trash, Sparkle, ArrowCounterClockwise, ArrowClockwise, UploadSimple, Sliders, GridFour, DownloadSimple, Sun, Moon, Monitor, MagicWand } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useCollageHistory, CollageSnapshot } from '@/hooks/use-collage-history'
@@ -36,6 +46,7 @@ import type { DominantColor } from '@/lib/color-intelligence'
 import { initMLWorker, disposeMLWorker, getWorkerStatus, onWorkerStatusChange, hasNativeFaceDetector } from '@/lib/ml-worker-client'
 import type { WorkerStatus } from '@/lib/ml-worker-client'
 import { cn } from '@/lib/utils'
+import { getStorageEstimate, isQuotaExceededError, requestPersistentStorage, type PersistentStorageStatus, type StorageEstimate } from '@/lib/storage'
 import { motion, AnimatePresence } from 'framer-motion'
 
 function initializePositions(layout: GridLayout, photosArray: UploadedPhoto[]): PhotoPosition[] {
@@ -85,7 +96,13 @@ function App() {
     photoPositions,
     settings,
     isLoading,
+    isInitializing,
+    initError,
+    sessionError,
     initCollage,
+    recoverSession,
+    retryInitialization,
+    retry,
     addPhoto,
     removePhoto,
     updateLayout,
@@ -117,6 +134,9 @@ function App() {
   const previewRef = useRef<HTMLDivElement>(null)
   const [editingArea, setEditingArea] = useState<string | null>(null)
   const settingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const uploadInProgressRef = useRef(false)
+  const collageIdRef = useRef(collageId)
+  collageIdRef.current = collageId
   const [availableLayouts, setAvailableLayouts] = useState<GridLayout[]>([])
   const [selectedLayout, setSelectedLayout] = useState<GridLayout | null>(null)
   const [showCarousel, setShowCarousel] = useState(false)
@@ -126,6 +146,9 @@ function App() {
   const [autoPositionRequest, setAutoPositionRequest] = useState(0)
   const positionRevisionRef = useRef(0)
   const completedAutoPositionRequestRef = useRef(0)
+  const [storageStatus, setStorageStatus] = useState<PersistentStorageStatus | null>(null)
+  const [storageEstimate, setStorageEstimate] = useState<StorageEstimate | null>(null)
+  const [clearDialogOpen, setClearDialogOpen] = useState(false)
   const isComparing = compareIds.length > 0
 
   // A completed analysis must never apply to positions that the user changed
@@ -148,6 +171,20 @@ function App() {
   useEffect(() => {
     return onWorkerStatusChange(setWorkerStatus)
   }, [])
+
+  useEffect(() => {
+    void requestPersistentStorage().then(setStorageStatus)
+    void getStorageEstimate().then(setStorageEstimate)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (settingsTimerRef.current) {
+        clearTimeout(settingsTimerRef.current)
+        settingsTimerRef.current = null
+      }
+    }
+  }, [collageId])
 
   // Initialize or dispose ML worker based on detection mode
   useEffect(() => {
@@ -271,12 +308,12 @@ function App() {
 
   // Initialize session if none exists
   useEffect(() => {
-    if (!collageId) {
-      initCollage()
+    if (!collageId && !isInitializing && !initError) {
+      void initCollage().catch(() => {})
     }
     // initCollage is a stable ref — safe to omit from deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collageId])
+  }, [collageId, isInitializing, initError])
 
   useEffect(() => {
     const layouts = getLayoutsForPhotoCount(photos.length)
@@ -307,6 +344,16 @@ function App() {
   }, [selectedLayoutId, availableLayouts])
 
   const handleFilesSelected = useCallback(async (files: File[]) => {
+    if (uploadInProgressRef.current) {
+      toast.info('An upload is already in progress.')
+      return
+    }
+    const uploadSessionId = collageId
+    if (!uploadSessionId) {
+      toast.error('Your collage is not ready yet. Please try again.')
+      return
+    }
+    uploadInProgressRef.current = true
     try {
       const remaining = MAX_PHOTOS - photos.length
       const toAdd = files.slice(0, remaining)
@@ -324,19 +371,40 @@ function App() {
         )
       }
 
-      await Promise.all(
+      if (collageIdRef.current !== uploadSessionId) {
+        toast.error('The active collage changed before the upload finished. No new photos were stored.')
+        return
+      }
+
+      const results = await Promise.allSettled(
         converted.map(async (file) => {
           const { dataUrl } = await correctExifOrientation(file)
+          if (collageIdRef.current !== uploadSessionId) {
+            throw new Error('The active collage changed during upload')
+          }
           const id = generateUniqueId()
           await addPhoto({ id, dataUrl, fileName: file.name })
         })
       )
-      toast.success(`Added ${converted.length} ${converted.length === 1 ? 'photo' : 'photos'}`)
+      const addedCount = results.filter((result) => result.status === 'fulfilled').length
+      const failedResults = results.filter((result) => result.status === 'rejected')
+      const failedCount = errors.length + failedResults.length
+
+      if (addedCount > 0) {
+        toast.success(`Added ${addedCount} ${addedCount === 1 ? 'photo' : 'photos'}`)
+      }
+      if (failedResults.some((result) => isQuotaExceededError(result.reason))) {
+        toast.error('Storage is full. Remove photos or clear this collage, then try again. Existing photos were not changed.')
+      } else if (failedCount > 0) {
+        toast.error(`${failedCount} ${failedCount === 1 ? 'photo could' : 'photos could'} not be added.`)
+      }
     } catch (error) {
       toast.error('Failed to upload photos')
       console.error(error)
+    } finally {
+      uploadInProgressRef.current = false
     }
-  }, [photos.length, addPhoto])
+  }, [photos.length, collageId, addPhoto])
 
   const handleRemovePhoto = useCallback(async (photoId: string) => {
     try {
@@ -432,9 +500,18 @@ function App() {
   }
 
   const handleClearAll = async () => {
-    await clearAll()
-    clearHistory()
-    toast.success('All photos cleared')
+    try {
+      if (settingsTimerRef.current) {
+        clearTimeout(settingsTimerRef.current)
+        settingsTimerRef.current = null
+      }
+      await clearAll()
+      clearHistory()
+      toast.success('All photos cleared')
+    } catch (error) {
+      toast.error(isQuotaExceededError(error) ? 'Storage is full. Your existing photos were kept.' : 'Could not clear this collage. Your photos were kept.')
+      console.error(error)
+    }
   }
 
   const handleEditPhoto = (area: string) => {
@@ -572,8 +649,30 @@ function App() {
     ? photos.find(p => p.id === editingPhotoId)
     : undefined
 
-  if (isLoading && !collageId) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  if (isLoading || isInitializing) {
+    return <div className="min-h-screen flex items-center justify-center">Opening your collage…</div>
+  }
+
+  if (sessionError || initError) {
+    const isMissing = sessionError?.kind === 'missing'
+    return (
+      <main className="min-h-screen flex items-center justify-center p-4">
+        <Card className="max-w-lg p-6 space-y-4">
+          <h1 className="text-xl font-semibold">{isMissing ? 'Your saved collage is unavailable' : 'We could not open your collage'}</h1>
+          <p className="text-muted-foreground">
+            {isMissing
+              ? 'The browser remembers a collage that is no longer in its local storage. Create a new empty collage to keep editing; this does not remove any other browser data.'
+              : 'Your local collage could not be read. Try again before creating a new collage so existing work is not replaced.'}
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {initError
+              ? <Button variant="outline" onClick={() => void retryInitialization().catch(() => {})}>Try again</Button>
+              : <Button variant="outline" onClick={() => void retry()}>Try again</Button>}
+            <Button onClick={() => void recoverSession().catch(() => {})}>{isMissing ? 'Create new collage' : 'Create a new collage'}</Button>
+          </div>
+        </Card>
+      </main>
+    )
   }
 
   return (
@@ -582,6 +681,14 @@ function App() {
       <UpdateToast needRefresh={needRefresh} onRefresh={updateSw} />
       <Toaster position="top-right" />
       <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-8 max-w-7xl">
+        {storageStatus && storageStatus !== 'granted' && (
+          <Card className="mb-4 p-4 text-sm text-muted-foreground" role="status">
+            {storageStatus === 'unavailable'
+              ? 'Your browser does not offer persistent-storage controls. You can keep editing, but browser storage may be cleared by the device or browser.'
+              : 'Your browser did not grant persistent storage. You can keep editing, but avoid clearing browser data to protect this collage.'}
+            {storageEstimate && ` Currently using ${Math.round(storageEstimate.usage / 1024 / 1024)} MB of ${Math.round(storageEstimate.quota / 1024 / 1024)} MB available.`}
+          </Card>
+        )}
         <header className="mb-4 sm:mb-8">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 sm:gap-3">
@@ -660,7 +767,7 @@ function App() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={handleClearAll}
+                    onClick={() => setClearDialogOpen(true)}
                     className="min-h-[44px]"
                   >
                     <Trash className="w-4 h-4 mr-2" weight="duotone" />
@@ -897,6 +1004,23 @@ function App() {
       )}
 
       <AppFooter />
+      <AlertDialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear this collage?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes all photos and layout data in this collage from this browser. A new empty collage will be created.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setClearDialogOpen(false)
+              void handleClearAll()
+            }}>Clear all photos</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
