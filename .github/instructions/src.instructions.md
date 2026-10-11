@@ -7,14 +7,14 @@ applyTo: "src/**"
 
 Applies to: `src/**`
 
-For project overview, commands, data model, API routes, and TDD workflow, see [AGENTS.md](../../AGENTS.md).
+For architecture, storage/editing contracts, validation commands, and safety guidance, see [AGENTS.md](../../AGENTS.md).
 
 ---
 
 ## Module Conventions
 
 - All imports within `src/` use the `@/` alias (maps to `src/`): `import { cn } from '@/lib/utils'`
-- All components use **named exports** — never default-export components
+- Reusable feature components use **named exports**; preserve the existing default export of the root `App` entry component
 - Props interfaces are declared inline above the function: `interface FooProps { ... }`
 - `src/main.tsx` and `src/ErrorFallback.tsx` are infrastructure files — do not add feature logic there
 
@@ -39,7 +39,7 @@ For project overview, commands, data model, API routes, and TDD workflow, see [A
 - Single source of truth for all collage state — backed by Dexie.js (IndexedDB)
 - `collageId` comes from `localStorage` (`'collage-session-id'`); absence means no session
 - Default settings returned when no session: `{ gap: 8, backgroundColor: 'transparent', borderRadius: 0 }`
-- `clearAll()` creates a **new session** (does not individually delete photos)
+- Confirmed `clearAll()` uses `replaceCollage()` to atomically delete the old collage, photos, and positions and create a **new session**
 - Settings changes from UI should be debounced (~300 ms) before calling `updateSettings`
 - `QueryClient` is configured with `staleTime: 0` — always refetches on mount
 - All mutations call functions from `@/lib/db` (not `fetch`)
@@ -105,12 +105,4 @@ screen.getByText('Upload Photos')
 
 ### Coverage Exclusions
 
-These files are explicitly excluded from Jest coverage thresholds (80% required elsewhere):
-
-| Path | Reason |
-|---|---|
-| `src/components/ui/**` | Generated shadcn components |
-| `src/App.tsx` | Integration component — covered by Playwright |
-| `src/ErrorFallback.tsx` | Uses `import.meta.env` (Vite-only API) |
-| `src/main.tsx` | Entry point |
-| `src/vite-end.d.ts`, `*.css` | Non-JS assets |
+[`jest.config.ts`](../../jest.config.ts) is the source of truth for coverage exclusions and the global 80% thresholds. Browser-only persistence, worker, and rendering behavior still needs real-browser verification even when excluded from Jest coverage.

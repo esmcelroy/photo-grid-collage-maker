@@ -43,3 +43,4 @@ todos.db-wal
 test-results/
 .playwright-mcp/
 screenshots/
+.amp/portals/*
