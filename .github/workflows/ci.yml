@@ -146,9 +146,30 @@ jobs:
               body,
             });
 
+  production-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install production test browsers
+        run: npx playwright install --with-deps chromium webkit
+      - name: Test production PWA in Chromium and WebKit
+        run: npm run test:production
+      - name: Upload production browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-playwright-report
+          path: test-results/production/
+          if-no-files-found: ignore
+
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [lint, typecheck, test, ui-test]
+    needs: [lint, typecheck, test, ui-test, production-test]
     permissions:
       contents: read
       pages: write
