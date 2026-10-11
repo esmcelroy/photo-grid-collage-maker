@@ -179,17 +179,22 @@ export async function addPhoto(
   collageId: string,
   photo: { id: string; dataUrl: string; fileName: string }
 ): Promise<{ id: string; fileName: string; dataUrl: string }> {
-  const existingCount = await db.photos.where('collageId').equals(collageId).count()
-  if (existingCount >= MAX_PHOTOS) {
-    throw new Error(`Maximum of ${MAX_PHOTOS} photos per collage`)
-  }
+  await db.transaction('rw', [db.collages, db.photos], async () => {
+    const collage = await db.collages.get(collageId)
+    if (!collage) throw new Error('Collage not found')
 
-  await db.photos.add({
-    id: photo.id,
-    collageId,
-    dataUrl: photo.dataUrl,
-    fileName: photo.fileName,
-    createdAt: new Date().toISOString(),
+    const existingCount = await db.photos.where('collageId').equals(collageId).count()
+    if (existingCount >= MAX_PHOTOS) {
+      throw new Error(`Maximum of ${MAX_PHOTOS} photos per collage`)
+    }
+
+    await db.photos.add({
+      id: photo.id,
+      collageId,
+      dataUrl: photo.dataUrl,
+      fileName: photo.fileName,
+      createdAt: new Date().toISOString(),
+    })
   })
 
   return { id: photo.id, fileName: photo.fileName, dataUrl: photo.dataUrl }
@@ -208,4 +213,29 @@ export async function deleteCollage(id: string): Promise<void> {
     await db.photos.where('collageId').equals(id).delete()
     await db.collages.delete(id)
   })
+}
+
+/**
+ * Atomically remove a session and all of its dependent records while creating
+ * the replacement session. This prevents a failed clear operation from either
+ * losing the active session or leaving its photos inaccessible.
+ */
+export async function replaceCollage(id: string): Promise<{ id: string }> {
+  const newId = generateId()
+  const now = new Date().toISOString()
+
+  await db.transaction('rw', [db.collages, db.photos, db.photoPositions], async () => {
+    await db.photoPositions.where('collageId').equals(id).delete()
+    await db.photos.where('collageId').equals(id).delete()
+    await db.collages.delete(id)
+    await db.collages.add({
+      id: newId,
+      selectedLayoutId: null,
+      settings: { ...DEFAULT_SETTINGS },
+      createdAt: now,
+      updatedAt: now,
+    })
+  })
+
+  return { id: newId }
 }

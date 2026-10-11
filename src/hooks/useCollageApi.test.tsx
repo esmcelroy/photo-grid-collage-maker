@@ -18,6 +18,7 @@ jest.unstable_mockModule('@/lib/db', () => ({
   addPhoto: jest.fn(),
   removePhoto: jest.fn(),
   deleteCollage: jest.fn(),
+  replaceCollage: jest.fn(),
   db: {},
 }))
 
@@ -249,12 +250,12 @@ describe('useCollageApi', () => {
   })
 
   describe('clearAll', () => {
-    it('creates a new collage and updates the session id', async () => {
+    it('replaces the previous collage and updates the session id', async () => {
       localStorage.setItem(SESSION_KEY, 'test-session-id')
 
       ;(collageDb.getCollageState as jest.MockedFunction<typeof collageDb.getCollageState>)
         .mockResolvedValue(mockCollageState)
-      ;(collageDb.createCollage as jest.MockedFunction<typeof collageDb.createCollage>)
+      ;(collageDb.replaceCollage as jest.MockedFunction<typeof collageDb.replaceCollage>)
         .mockResolvedValueOnce({ id: 'new-cleared-id' })
 
       const { wrapper } = createWrapper()
@@ -266,7 +267,7 @@ describe('useCollageApi', () => {
         await result.current.clearAll()
       })
 
-      expect(collageDb.createCollage).toHaveBeenCalled()
+      expect(collageDb.replaceCollage).toHaveBeenCalledWith('test-session-id')
       expect(localStorage.getItem(SESSION_KEY)).toBe('new-cleared-id')
     })
   })
@@ -303,6 +304,29 @@ describe('useCollageApi', () => {
       expect(result.current.photos).toHaveLength(1)
       expect(result.current.selectedLayoutId).toBe('layout-1')
       expect(collageDb.getCollageState).toHaveBeenCalledWith('test-session-id')
+    })
+
+    it('keeps a stale session ID until the user explicitly recovers', async () => {
+      localStorage.setItem(SESSION_KEY, 'missing-session-id')
+      ;(collageDb.getCollageState as jest.MockedFunction<typeof collageDb.getCollageState>)
+        .mockResolvedValue(null)
+
+      const { wrapper } = createWrapper()
+      const { result } = renderHook(() => useCollageApi(), { wrapper })
+
+      await waitFor(() => expect(result.current.sessionError?.kind).toBe('missing'))
+      expect(localStorage.getItem(SESSION_KEY)).toBe('missing-session-id')
+
+      ;(collageDb.createCollage as jest.MockedFunction<typeof collageDb.createCollage>)
+        .mockResolvedValueOnce({ id: 'recovered-session-id' })
+      ;(collageDb.getCollageState as jest.MockedFunction<typeof collageDb.getCollageState>)
+        .mockResolvedValue({ ...mockCollageState, id: 'recovered-session-id' })
+
+      await act(async () => {
+        await result.current.recoverSession()
+      })
+
+      expect(localStorage.getItem(SESSION_KEY)).toBe('recovered-session-id')
     })
   })
 })

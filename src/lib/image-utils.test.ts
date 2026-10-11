@@ -13,9 +13,17 @@ import {
   fileToDataUrl,
   correctExifOrientation,
   convertModernColors,
+  downloadCollage,
   replaceOklchInSubtree,
   replaceOklchCustomProperties,
 } from '@/lib/image-utils'
+
+describe('downloadCollage validation', () => {
+  it('rejects unsafe dimensions before loading the renderer', async () => {
+    await expect(downloadCollage(document.createElement('div'), 'collage.png', 'png', 1, 9000, 1))
+      .rejects.toThrow(/8192/)
+  })
+})
 
 // ---------------------------------------------------------------------------
 // generateUniqueId

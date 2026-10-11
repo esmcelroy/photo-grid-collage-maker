@@ -41,9 +41,16 @@ interface CollageApiState {
   settings: CollageSettings
 }
 
+class MissingCollageError extends Error {
+  constructor() {
+    super('The saved collage could not be found')
+    this.name = 'MissingCollageError'
+  }
+}
+
 async function fetchCollageFromDb(id: string): Promise<CollageApiState> {
   const state = await collageDb.getCollageState(id)
-  if (!state) throw new Error('Collage not found')
+  if (!state) throw new MissingCollageError()
   return {
     ...state,
     photos: state.photos.map(dbPhotoToUploadedPhoto),
@@ -74,6 +81,7 @@ export function useCollageApi() {
     data: collageState,
     isLoading,
     error,
+    refetch,
   } = useQuery({
     queryKey,
     queryFn: () => fetchCollageFromDb(sessionId!),
@@ -89,10 +97,10 @@ export function useCollageApi() {
   })
 
   const addPhotoMutation = useMutation({
-    mutationFn: (photo: { id: string; dataUrl: string; fileName: string }) =>
-      collageDb.addPhoto(sessionIdRef.current!, photo),
-    onSuccess: (dbPhoto) => {
-      const key = ['collage', sessionIdRef.current]
+    mutationFn: ({ collageId, photo }: { collageId: string; photo: { id: string; dataUrl: string; fileName: string } }) =>
+      collageDb.addPhoto(collageId, photo),
+    onSuccess: (dbPhoto, { collageId }) => {
+      const key = ['collage', collageId]
       queryClient.setQueryData<CollageApiState | undefined>(key, (current) => {
         if (!current) return current
         return {
@@ -137,7 +145,10 @@ export function useCollageApi() {
 
   const clearAllMutation = useMutation({
     mutationFn: async () => {
-      const { id } = await collageDb.createCollage()
+      const currentId = sessionIdRef.current
+      const { id } = currentId
+        ? await collageDb.replaceCollage(currentId)
+        : await collageDb.createCollage()
       setSessionId(id)
       return { id }
     },
@@ -160,7 +171,7 @@ export function useCollageApi() {
   const clearAllMutationRef = useRef(clearAllMutation)
   clearAllMutationRef.current = clearAllMutation
 
-  const initCollage = useCallback(() => initMutationRef.current.mutate(), [])
+  const initCollage = useCallback(() => initMutationRef.current.mutateAsync(), [])
   const updateLayout = useCallback(
     (selectedLayoutId: string | null, photoPositions: PhotoPosition[]) =>
       updateLayoutMutationRef.current.mutateAsync({ selectedLayoutId, photoPositions }),
@@ -175,6 +186,11 @@ export function useCollageApi() {
     (settings: CollageSettings) => updateSettingsMutationRef.current.mutateAsync(settings),
     []
   )
+  const recoverSession = useCallback(() => initMutationRef.current.mutateAsync(), [])
+  const retry = useCallback(() => refetch(), [refetch])
+  const sessionError = error
+    ? { kind: error instanceof MissingCollageError ? 'missing' as const : 'read' as const, error }
+    : null
 
   return {
     // State
@@ -185,15 +201,24 @@ export function useCollageApi() {
     settings: collageState?.settings ?? { gap: 8, backgroundColor: 'transparent', borderRadius: 0 },
     isLoading,
     error,
+    initError: initMutation.error,
+    isInitializing: initMutation.isPending,
+    sessionError,
 
     // Actions
     initCollage,
-    addPhoto: (photo: { id: string; dataUrl: string; fileName: string }) =>
-      addPhotoMutationRef.current.mutateAsync(photo),
+    addPhoto: (photo: { id: string; dataUrl: string; fileName: string }) => {
+      const currentId = sessionIdRef.current
+      if (!currentId) return Promise.reject(new Error('No active collage'))
+      return addPhotoMutationRef.current.mutateAsync({ collageId: currentId, photo })
+    },
     removePhoto: (photoId: string) => removePhotoMutationRef.current.mutateAsync(photoId),
     updateLayout,
     updatePositions,
     updateSettings,
     clearAll: () => clearAllMutationRef.current.mutateAsync(),
+    recoverSession,
+    retryInitialization: initCollage,
+    retry,
   }
 }
