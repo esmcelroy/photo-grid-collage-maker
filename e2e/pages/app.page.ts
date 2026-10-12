@@ -217,6 +217,52 @@ export class AppPage {
     await this.assertEditedPhoto()
   }
 
+  /**
+   * Edit the first photo through the preview's sequential keyboard controls.
+   * This verifies that the edit action is reachable without pointer hover and
+   * that focus returns to it after the dialog closes.
+   */
+  async editFirstPhotoWithKeyboard() {
+    const editAction = this.page.getByRole('button', { name: 'Edit photo in slot a' })
+
+    await this.tabTo('Photo slot a, click or drag to reorder')
+    await this.page.keyboard.press('Tab')
+    await expect(this.page.locator(':focus')).toHaveAttribute('aria-label', 'Edit photo in slot a')
+    await this.page.keyboard.press('Tab')
+    await expect(this.page.locator(':focus')).toHaveAttribute('aria-label', 'Photo slot b, click or drag to reorder')
+    await this.page.keyboard.press('Tab')
+    await expect(this.page.locator(':focus')).toHaveAttribute('aria-label', 'Edit photo in slot b')
+    await this.page.keyboard.press('Shift+Tab')
+    await this.page.keyboard.press('Shift+Tab')
+    await expect(editAction).toBeFocused()
+    await this.page.keyboard.press('Enter')
+
+    const dialog = this.page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await expect.poll(() => dialog.evaluate(element => element.contains(document.activeElement))).toBe(true)
+
+    await this.page.getByRole('button', { name: 'Rotate clockwise', exact: true }).focus()
+    await this.page.keyboard.press('Enter')
+    const sliders = dialog.getByRole('slider')
+    await sliders.nth(0).focus()
+    await this.page.keyboard.press('ArrowRight')
+    await sliders.nth(1).focus()
+    await this.page.keyboard.press('ArrowRight')
+    await this.page.getByRole('button', { name: 'Apply', exact: true }).focus()
+    await this.page.keyboard.press('Enter')
+
+    await expect(editAction).toBeFocused()
+    await this.assertEditedPhoto()
+  }
+
+  private async tabTo(accessibleName: string) {
+    for (let index = 0; index < 40; index += 1) {
+      await this.page.keyboard.press('Tab')
+      if (await this.page.locator(':focus').getAttribute('aria-label') === accessibleName) return
+    }
+    throw new Error(`Could not reach ${accessibleName} with sequential Tab navigation`)
+  }
+
   async assertEditedPhoto() {
     const photo = this.page.locator('[data-grid-area]').first().locator('img')
     await expect(photo).toHaveCSS('object-position', '51% 50%')

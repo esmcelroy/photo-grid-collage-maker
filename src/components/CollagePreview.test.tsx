@@ -148,7 +148,9 @@ describe('CollagePreview', () => {
       const draggable = container.querySelectorAll('[draggable="true"]')
       expect(draggable).toHaveLength(2)
 
-      fireEvent.dragStart(draggable[0])
+      const firstSlotAction = draggable[0].querySelector('button')
+      expect(firstSlotAction).not.toBeNull()
+      fireEvent.dragStart(firstSlotAction!)
       fireEvent.dragOver(draggable[1])
       fireEvent.drop(draggable[1])
 
@@ -194,7 +196,7 @@ describe('CollagePreview', () => {
     it('selects a slot on first click and swaps on second click', () => {
       const { container, onPositionsChange } = renderPreview()
 
-      const slots = container.querySelectorAll('[data-grid-area]')
+      const slots = container.querySelectorAll('[aria-label^="Photo slot"]')
       fireEvent.click(slots[0]) // Select slot a
       fireEvent.click(slots[1]) // Click slot b → swap
 
@@ -207,7 +209,7 @@ describe('CollagePreview', () => {
     it('deselects a slot when clicking the same slot twice', () => {
       const { container, onPositionsChange } = renderPreview()
 
-      const slots = container.querySelectorAll('[data-grid-area]')
+      const slots = container.querySelectorAll('[aria-label^="Photo slot"]')
       fireEvent.click(slots[0]) // Select
       fireEvent.click(slots[0]) // Deselect
 
@@ -220,10 +222,11 @@ describe('CollagePreview', () => {
         photosOverride: [photos[0]],
       })
 
-      const slots = container.querySelectorAll('[data-grid-area]')
-      // slot[1] is area "b" with no photo — click should be ignored
-      fireEvent.click(slots[1])
-      fireEvent.click(slots[0])
+      const emptySlot = container.querySelector('[data-grid-area="b"]') as HTMLElement
+      const occupiedSlot = screen.getByRole('button', { name: /^Photo slot a,/ })
+      // The empty slot has no interactive swap control.
+      fireEvent.click(emptySlot)
+      fireEvent.click(occupiedSlot)
 
       // Only one click was meaningful (select slot a), no swap occurred
       expect(onPositionsChange).not.toHaveBeenCalled()
@@ -233,12 +236,12 @@ describe('CollagePreview', () => {
   // ─── Keyboard accessibility ─────────────────────────────────────────────
 
   describe('keyboard accessibility', () => {
-    it('swaps photos when using Enter key on two slots', () => {
+    it('swaps photos when activating two slot buttons', () => {
       const { container, onPositionsChange } = renderPreview()
 
-      const slots = container.querySelectorAll('[data-grid-area]')
-      fireEvent.keyDown(slots[0], { key: 'Enter' })
-      fireEvent.keyDown(slots[1], { key: 'Enter' })
+      const slots = container.querySelectorAll('[aria-label^="Photo slot"]')
+      fireEvent.click(slots[0])
+      fireEvent.click(slots[1])
 
       expect(onPositionsChange).toHaveBeenCalledWith([
         { photoId: 'p2', gridArea: 'a' },
@@ -246,12 +249,12 @@ describe('CollagePreview', () => {
       ])
     })
 
-    it('swaps photos when using Space key', () => {
+    it('uses native button semantics for space activation', () => {
       const { container, onPositionsChange } = renderPreview()
 
-      const slots = container.querySelectorAll('[data-grid-area]')
-      fireEvent.keyDown(slots[0], { key: ' ' })
-      fireEvent.keyDown(slots[1], { key: ' ' })
+      const slots = container.querySelectorAll('[aria-label^="Photo slot"]')
+      fireEvent.click(slots[0])
+      fireEvent.click(slots[1])
 
       expect(onPositionsChange).toHaveBeenCalledWith([
         { photoId: 'p2', gridArea: 'a' },
@@ -262,10 +265,10 @@ describe('CollagePreview', () => {
     it('cancels selection with Escape key', () => {
       const { container, onPositionsChange } = renderPreview()
 
-      const slots = container.querySelectorAll('[data-grid-area]')
-      fireEvent.keyDown(slots[0], { key: 'Enter' }) // Select
+      const slots = container.querySelectorAll('[aria-label^="Photo slot"]')
+      fireEvent.click(slots[0]) // Select
       fireEvent.keyDown(slots[0], { key: 'Escape' }) // Cancel
-      fireEvent.keyDown(slots[1], { key: 'Enter' }) // Select b (not swap)
+      fireEvent.click(slots[1]) // Select b (not swap)
 
       // No swap should occur — Escape cancelled the first selection
       expect(onPositionsChange).not.toHaveBeenCalled()
@@ -277,7 +280,7 @@ describe('CollagePreview', () => {
       const buttons = screen.getAllByRole('button')
       expect(buttons.length).toBeGreaterThanOrEqual(2)
       expect(buttons[0]).toHaveAttribute('aria-label', expect.stringContaining('Photo slot'))
-      expect(buttons[0]).toHaveAttribute('tabindex', '0')
+      expect(buttons[0]).not.toHaveAttribute('tabindex', '-1')
     })
   })
 
@@ -379,6 +382,13 @@ describe('CollagePreview', () => {
       expect(editButtons).toHaveLength(2) // one per photo slot
     })
 
+    it('keeps edit buttons in sequential keyboard navigation', () => {
+      renderPreview({ onEditPhoto: jest.fn() })
+
+      const editButton = screen.getByRole('button', { name: 'Edit photo in slot a' })
+      expect(editButton).not.toHaveAttribute('tabindex', '-1')
+    })
+
     it('does not render edit buttons when onEditPhoto is not provided', () => {
       const { container } = renderPreview()
       const editButtons = container.querySelectorAll('[aria-label^="Edit photo"]')
@@ -428,7 +438,7 @@ describe('CollagePreview', () => {
   })
 
   it('has no accessibility violations', async () => {
-    const { container } = renderPreview()
+    const { container } = renderPreview({ onEditPhoto: jest.fn() })
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })

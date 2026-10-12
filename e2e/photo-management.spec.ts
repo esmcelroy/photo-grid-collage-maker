@@ -74,6 +74,11 @@ test.describe('Photo Management', () => {
     await app.assertPhotoCountBadge(2)
   })
 
+  test('keyboard-only editing opens the dialog and returns focus to the editor', async () => {
+    await app.uploadViaHiddenInput(['test-image.jpg', 'test-image-2.jpg'])
+    await app.editFirstPhotoWithKeyboard()
+  })
+
   test('never stores more than the 16-photo session limit', async ({ page }) => {
     const input = page.locator('input[type="file"][accept^="image/"]')
     await input.setInputFiles(Array.from({ length: 17 }, () => 'test-image.jpg').map((filePath) =>
