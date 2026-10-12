@@ -8,6 +8,7 @@ import type { CollageSettings, PhotoPosition } from '@/lib/types'
 
 export interface CollageRecord {
   id: string
+  name: string
   selectedLayoutId: string | null
   settings: CollageSettings
   createdAt: string
@@ -34,6 +35,7 @@ export interface PhotoPositionRecord {
 // Assembled state returned to the UI (mirrors the old API response)
 export interface CollageState {
   id: string
+  name?: string
   photos: Array<{ id: string; fileName: string; dataUrl: string }>
   selectedLayoutId: string | null
   photoPositions: PhotoPosition[]
@@ -61,6 +63,15 @@ class CollageDatabase extends Dexie {
       collages: 'id',
       photos: 'id, collageId',
       photoPositions: '[collageId+photoId], collageId',
+    })
+    this.version(3).stores({
+      collages: 'id, updatedAt',
+      photos: 'id, collageId',
+      photoPositions: '[collageId+photoId], collageId',
+    }).upgrade(async tx => {
+      await tx.table('collages').toCollection().modify((collage: CollageRecord) => {
+        collage.name ||= 'Untitled collage'
+      })
     })
   }
 }
@@ -94,11 +105,12 @@ function generateId(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
-export async function createCollage(): Promise<{ id: string }> {
+export async function createCollage(name = 'Untitled collage'): Promise<{ id: string }> {
   const id = generateId()
   const now = new Date().toISOString()
   await db.collages.add({
     id,
+    name,
     selectedLayoutId: null,
     settings: { ...DEFAULT_SETTINGS },
     createdAt: now,
@@ -116,6 +128,7 @@ export async function getCollageState(id: string): Promise<CollageState | null> 
 
   return {
     id: collage.id,
+    name: collage.name || 'Untitled collage',
     photos: photos.map((p) => ({ id: p.id, fileName: p.fileName, dataUrl: p.dataUrl })),
     selectedLayoutId: collage.selectedLayoutId,
     photoPositions: positions.map((p) => ({
@@ -135,6 +148,7 @@ export async function updateCollage(
     selectedLayoutId?: string | null
     photoPositions?: PhotoPosition[]
     settings?: CollageSettings
+    name?: string
   }
 ): Promise<CollageState> {
   await db.transaction('rw', [db.collages, db.photoPositions], async () => {
@@ -149,6 +163,7 @@ export async function updateCollage(
     if (updates.settings !== undefined) {
       patch.settings = updates.settings
     }
+    if (updates.name !== undefined) patch.name = updates.name.trim() || 'Untitled collage'
 
     await db.collages.update(id, patch)
 
@@ -173,6 +188,49 @@ export async function updateCollage(
   const state = await getCollageState(id)
   if (!state) throw new Error('Collage not found after update')
   return state
+}
+
+export interface ProjectSummary { id: string; name: string; updatedAt: string; photoCount: number; preview?: string }
+export async function listProjects(): Promise<ProjectSummary[]> {
+  const collages = await db.collages.orderBy('updatedAt').reverse().toArray()
+  return Promise.all(collages.map(async collage => {
+    const photos = await db.photos.where('collageId').equals(collage.id).toArray()
+    return { id: collage.id, name: collage.name || 'Untitled collage', updatedAt: collage.updatedAt, photoCount: photos.length, preview: photos[0]?.dataUrl }
+  }))
+}
+
+export async function duplicateCollage(id: string, name?: string): Promise<{ id: string }> {
+  const source = await getCollageState(id)
+  if (!source) throw new Error('Collage not found')
+  return importProject({ version: 1, project: { ...source, id: generateId(), name: name || `${source.name} copy` } })
+}
+
+export interface ProjectBackup { version: 1; project: CollageState }
+const MAX_BACKUP_BYTES = 50 * 1024 * 1024
+export function validateProjectBackup(value: unknown): asserts value is ProjectBackup {
+  if (!value || typeof value !== 'object' || (value as ProjectBackup).version !== 1) throw new Error('Unsupported backup format version')
+  const project = (value as ProjectBackup).project
+  if (!project || !Array.isArray(project.photos) || !Array.isArray(project.photoPositions) || project.photos.length > MAX_PHOTOS) throw new Error('Backup has invalid project data or too many photos')
+  if (JSON.stringify(value).length > MAX_BACKUP_BYTES) throw new Error('Backup file is too large')
+  const ids = new Set(project.photos.map(photo => photo.id))
+  if (project.photoPositions.some(position => !ids.has(position.photoId))) throw new Error('Backup references a missing photo')
+}
+export async function exportProject(id: string): Promise<ProjectBackup> {
+  const project = await getCollageState(id)
+  if (!project) throw new Error('Collage not found')
+  return { version: 1, project }
+}
+export async function importProject(backup: unknown): Promise<{ id: string }> {
+  validateProjectBackup(backup)
+  const { project } = backup
+  const id = generateId()
+  const now = new Date().toISOString()
+  await db.transaction('rw', [db.collages, db.photos, db.photoPositions], async () => {
+    await db.collages.add({ id, name: project.name?.trim() || 'Imported collage', selectedLayoutId: project.selectedLayoutId, settings: project.settings, createdAt: now, updatedAt: now })
+    await db.photos.bulkAdd(project.photos.map(photo => ({ ...photo, collageId: id, createdAt: now })))
+    await db.photoPositions.bulkAdd(project.photoPositions.map(position => ({ ...position, collageId: id })))
+  })
+  return { id }
 }
 
 export async function addPhoto(
@@ -230,6 +288,7 @@ export async function replaceCollage(id: string): Promise<{ id: string }> {
     await db.collages.delete(id)
     await db.collages.add({
       id: newId,
+    name: 'Untitled collage',
       selectedLayoutId: null,
       settings: { ...DEFAULT_SETTINGS },
       createdAt: now,

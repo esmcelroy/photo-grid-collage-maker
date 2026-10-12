@@ -18,6 +18,7 @@ import { AppFooter } from '@/components/AppFooter'
 import { InstallButton } from '@/components/InstallButton'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { UpdateToast } from '@/components/UpdateToast'
+import { ProjectLibrary } from '@/components/ProjectLibrary'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -109,6 +110,7 @@ function App() {
     updatePositions,
     updateSettings,
     clearAll,
+    projects, createProject, openProject, renameProject, duplicateProject, deleteProject, exportProject, importProject,
   } = useCollageApi()
 
   const { canUndo, canRedo, pushSnapshot, undo, redo, setRestoring, clear: clearHistory } = useCollageHistory()
@@ -161,6 +163,14 @@ function App() {
     positionRevisionRef.current += 1
     completedAutoPositionRequestRef.current = autoPositionRequest
   }, [autoPositionRequest])
+
+  useEffect(() => {
+    clearHistory()
+    setEditingArea(null)
+    cancelPendingAutoPosition()
+    // Project identity is the isolation boundary; history callbacks are stable in production.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collageId])
 
   const handleSmartPositionToggle = useCallback(() => {
     const nextEnabled = !smartPositionEnabled
@@ -755,6 +765,7 @@ function App() {
             </div>
           </div>
         </header>
+        <ProjectLibrary projects={projects} activeId={collageId} onOpen={openProject} onCreate={createProject} onRename={renameProject} onDuplicate={duplicateProject} onDelete={deleteProject} onExport={exportProject} onImport={importProject} />
 
         <main className="grid lg:grid-cols-3 gap-6 mb-6">
           <div className="lg:col-span-2 space-y-6 min-w-0">
