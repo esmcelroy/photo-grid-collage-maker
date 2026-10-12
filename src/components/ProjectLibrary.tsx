@@ -14,6 +14,8 @@ interface ProjectLibraryProps {
   onImport: (backup: unknown) => Promise<void>
 }
 
+const MAX_BACKUP_BYTES = 50 * 1024 * 1024
+
 export function ProjectLibrary({ projects = [], activeId, onOpen, onCreate, onRename, onDuplicate, onDelete, onExport, onImport }: ProjectLibraryProps) {
   const [error, setError] = useState('')
   const input = useRef<HTMLInputElement>(null)
@@ -27,7 +29,18 @@ export function ProjectLibrary({ projects = [], activeId, onOpen, onCreate, onRe
       <Button size="sm" onClick={() => void onCreate(window.prompt('Project name', 'Untitled collage') || 'Untitled collage')}>New project</Button>
       <Button size="sm" variant="outline" onClick={() => void save()}>Back up</Button>
       <Button size="sm" variant="outline" onClick={() => input.current?.click()}>Restore backup</Button>
-      <input ref={input} className="sr-only" type="file" accept="application/json" aria-label="Restore backup file" onChange={async e => { const file = e.target.files?.[0]; if (!file) return; try { await onImport(JSON.parse(await file.text())); setError('') } catch (cause) { setError(cause instanceof Error ? cause.message : 'Backup could not be restored') } e.currentTarget.value = '' }} />
+      <input ref={input} className="sr-only" type="file" accept="application/json" aria-label="Restore backup file" onChange={async event => {
+        const file = event.target.files?.[0]
+        event.target.value = ''
+        if (!file) return
+        try {
+          if (file.size > MAX_BACKUP_BYTES) throw new Error('Backup file is too large')
+          await onImport(JSON.parse(await file.text()))
+          setError('')
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : 'Backup could not be restored')
+        }
+      }} />
     </div>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     <ul className="mt-2 flex flex-wrap gap-2" aria-label="Saved projects">{projects.map(project => <li key={project.id} className="border rounded p-2 flex gap-2 items-center">

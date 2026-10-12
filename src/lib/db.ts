@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie'
 import { MAX_PHOTOS } from '@/lib/types'
 import type { CollageSettings, PhotoPosition } from '@/lib/types'
+import { GRID_LAYOUTS } from '@/lib/layouts'
 
 // ---------------------------------------------------------------------------
 // Database record types (stored in IndexedDB)
@@ -207,13 +208,31 @@ export async function duplicateCollage(id: string, name?: string): Promise<{ id:
 
 export interface ProjectBackup { version: 1; project: CollageState }
 const MAX_BACKUP_BYTES = 50 * 1024 * 1024
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+function isSettings(value: unknown): value is CollageSettings {
+  return isRecord(value) && typeof value.gap === 'number' && Number.isFinite(value.gap) && value.gap >= 0 && value.gap <= 100
+    && typeof value.backgroundColor === 'string' && value.backgroundColor.length <= 100
+    && typeof value.borderRadius === 'number' && Number.isFinite(value.borderRadius) && value.borderRadius >= 0 && value.borderRadius <= 100
+}
 export function validateProjectBackup(value: unknown): asserts value is ProjectBackup {
-  if (!value || typeof value !== 'object' || (value as ProjectBackup).version !== 1) throw new Error('Unsupported backup format version')
-  const project = (value as ProjectBackup).project
-  if (!project || !Array.isArray(project.photos) || !Array.isArray(project.photoPositions) || project.photos.length > MAX_PHOTOS) throw new Error('Backup has invalid project data or too many photos')
-  if (JSON.stringify(value).length > MAX_BACKUP_BYTES) throw new Error('Backup file is too large')
-  const ids = new Set(project.photos.map(photo => photo.id))
-  if (project.photoPositions.some(position => !ids.has(position.photoId))) throw new Error('Backup references a missing photo')
+  if (!isRecord(value) || value.version !== 1 || !isRecord(value.project)) throw new Error('Unsupported backup format version')
+  const project = value.project
+  if (typeof project.name !== 'string' || project.name.length > 200 || !Array.isArray(project.photos) || !Array.isArray(project.photoPositions) || project.photos.length > MAX_PHOTOS || !isSettings(project.settings) || !(typeof project.selectedLayoutId === 'string' || project.selectedLayoutId === null)) throw new Error('Backup has invalid project data')
+  const ids = new Set<string>()
+  for (const photo of project.photos) {
+    if (!isRecord(photo) || typeof photo.id !== 'string' || !photo.id || ids.has(photo.id) || typeof photo.fileName !== 'string' || !photo.fileName || typeof photo.dataUrl !== 'string' || !/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(photo.dataUrl)) throw new Error('Backup contains an invalid photo')
+    ids.add(photo.id)
+  }
+  const layout = project.selectedLayoutId === null ? null : GRID_LAYOUTS.find(candidate => candidate.id === project.selectedLayoutId)
+  if ((project.photos.length === 0 && project.selectedLayoutId !== null) || (project.photos.length > 0 && (!layout || layout.photoCount !== project.photos.length))) throw new Error('Backup layout is incompatible with its photos')
+  const areas = new Set(layout?.areas.flatMap(row => row.split(/\s+/)) ?? [])
+  const seenAreas = new Set<string>()
+  for (const position of project.photoPositions) {
+    if (!isRecord(position) || typeof position.photoId !== 'string' || !ids.has(position.photoId) || typeof position.gridArea !== 'string' || !areas.has(position.gridArea) || seenAreas.has(position.gridArea) || (position.objectPosition !== undefined && typeof position.objectPosition !== 'string') || (position.rotation !== undefined && (typeof position.rotation !== 'number' || !Number.isFinite(position.rotation) || position.rotation < -360 || position.rotation > 360)) || (position.scale !== undefined && (typeof position.scale !== 'number' || !Number.isFinite(position.scale) || position.scale < 0.1 || position.scale > 10))) throw new Error('Backup contains invalid photo transforms')
+    seenAreas.add(position.gridArea)
+  }
 }
 export async function exportProject(id: string): Promise<ProjectBackup> {
   const project = await getCollageState(id)
@@ -224,11 +243,12 @@ export async function importProject(backup: unknown): Promise<{ id: string }> {
   validateProjectBackup(backup)
   const { project } = backup
   const id = generateId()
+  const photoIds = new Map(project.photos.map(photo => [photo.id, generateId()]))
   const now = new Date().toISOString()
   await db.transaction('rw', [db.collages, db.photos, db.photoPositions], async () => {
     await db.collages.add({ id, name: project.name?.trim() || 'Imported collage', selectedLayoutId: project.selectedLayoutId, settings: project.settings, createdAt: now, updatedAt: now })
-    await db.photos.bulkAdd(project.photos.map(photo => ({ ...photo, collageId: id, createdAt: now })))
-    await db.photoPositions.bulkAdd(project.photoPositions.map(position => ({ ...position, collageId: id })))
+    await db.photos.bulkAdd(project.photos.map(photo => ({ ...photo, id: photoIds.get(photo.id)!, collageId: id, createdAt: now })))
+    await db.photoPositions.bulkAdd(project.photoPositions.map(position => ({ ...position, photoId: photoIds.get(position.photoId)!, collageId: id })))
   })
   return { id }
 }
@@ -253,15 +273,17 @@ export async function addPhoto(
       fileName: photo.fileName,
       createdAt: new Date().toISOString(),
     })
+    await db.collages.update(collageId, { updatedAt: new Date().toISOString() })
   })
 
   return { id: photo.id, fileName: photo.fileName, dataUrl: photo.dataUrl }
 }
 
 export async function removePhoto(collageId: string, photoId: string): Promise<void> {
-  await db.transaction('rw', [db.photos, db.photoPositions], async () => {
+  await db.transaction('rw', [db.collages, db.photos, db.photoPositions], async () => {
     await db.photos.delete(photoId)
     await db.photoPositions.where('[collageId+photoId]').equals([collageId, photoId]).delete()
+    await db.collages.update(collageId, { updatedAt: new Date().toISOString() })
   })
 }
 
