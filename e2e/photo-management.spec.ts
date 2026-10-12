@@ -103,9 +103,12 @@ test.describe('Photo Management', () => {
 
     await page.evaluate(() => {
       const probe = document.createElement('div')
-      probe.innerHTML = '<div id="editable-host" contenteditable="true">draft<span id="editable-child" tabindex="0"> child</span><span id="non-editable-child" contenteditable="false" tabindex="0">button</span></div>'
+      probe.innerHTML = '<textarea id="editable-textarea">draft</textarea><div id="editable-host" contenteditable="true">draft<span id="editable-child" tabindex="0"> child</span><span id="non-editable-child" contenteditable="false" tabindex="0">button</span></div>'
       document.body.append(probe)
     })
+
+    await app.assertNativeTextUndoRedo(page.locator('#editable-textarea'), ' text')
+    await expect(page.getByText('10px', { exact: true })).toBeVisible()
 
     const editableHost = page.locator('#editable-host')
     await editableHost.focus()
