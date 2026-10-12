@@ -19,13 +19,13 @@ echo "Installing locked npm dependencies"
 npm ci
 
 playwright_version="$(node -p "require('./node_modules/@playwright/test/package.json').version")"
-playwright_marker="$HOME/.cache/ms-playwright/.orb-deps-$playwright_version"
+playwright_marker="$HOME/.cache/ms-playwright/.orb-deps-chromium-webkit-$playwright_version"
 if [ ! -f "$playwright_marker" ]; then
-  echo "Installing Chromium and its Debian dependencies"
-  npx playwright install --with-deps chromium
+  echo "Installing Chromium, WebKit, and their Debian dependencies"
+  npx playwright install --with-deps chromium webkit
   mkdir -p "$(dirname "$playwright_marker")"
   touch "$playwright_marker"
 else
-  echo "Checking Playwright Chromium installation"
-  npx playwright install chromium
+  echo "Checking Playwright Chromium and WebKit installation"
+  npx playwright install chromium webkit
 fi

@@ -200,6 +200,84 @@ export class AppPage {
     return this.page.locator('[data-grid-area]').first().locator('..').screenshot()
   }
 
+  async waitForOfflineReady() {
+    await this.page.evaluate(async () => { await navigator.serviceWorker.ready })
+    await this.page.reload({ waitUntil: 'domcontentloaded' })
+    await this.page.waitForFunction(() => navigator.serviceWorker.controller !== null)
+  }
+
+  async editFirstPhoto() {
+    await this.page.locator('[data-grid-area]').first().hover()
+    await this.page.getByRole('button', { name: /^Edit photo in slot/ }).first().click()
+    await this.page.getByRole('button', { name: 'Rotate clockwise', exact: true }).click()
+    const sliders = this.page.getByRole('dialog').getByRole('slider')
+    await sliders.nth(0).press('ArrowRight')
+    await sliders.nth(1).press('ArrowRight')
+    await this.page.getByRole('button', { name: 'Apply', exact: true }).click()
+    await this.assertEditedPhoto()
+  }
+
+  async assertEditedPhoto() {
+    const photo = this.page.locator('[data-grid-area]').first().locator('img')
+    await expect(photo).toHaveCSS('object-position', '51% 50%')
+    await expect(photo).toHaveCSS('transform', 'matrix(0, 1.05, -1.05, 0, 0, 0)')
+  }
+
+  async assertOfflineNotice() {
+    const notice = this.page.getByText("You're offline — some tools need previously cached downloads.")
+    await expect(notice).toBeVisible()
+    // Capture the persistent notice after transient upload/export toasts leave.
+    await expect(this.page.locator('[data-sonner-toast]')).toHaveCount(0, { timeout: 15_000 })
+    await notice.scrollIntoViewIfNeeded()
+    const storageGuidance = this.page.getByRole('status').filter({ hasText: /persistent.storage/ })
+    const content = await storageGuidance.count()
+      ? storageGuidance
+      : this.page.getByRole('heading', { name: 'Collage Maker', exact: true })
+    const banner = (await notice.boundingBox())!
+    const below = (await content.boundingBox())!
+    expect(below.y).toBeGreaterThanOrEqual(banner.y + banner.height)
+  }
+
+  async uploadWithUncachedHeic() {
+    const { readFile } = await import('node:fs/promises')
+    const failedDecoder = this.page.waitForEvent('requestfailed', {
+      predicate: request => /libheif-js-.*\.js/.test(request.url()),
+    })
+    await this.page.locator('input[type="file"]').setInputFiles([
+      // The decoder import fails before these bytes can be decoded. This tests
+      // unavailable-code feedback, not HEIC decoding or image-format support.
+      { name: 'uncached.heic', mimeType: 'image/heic', buffer: Buffer.from('unused offline input') },
+      { name: 'offline.jpg', mimeType: 'image/jpeg', buffer: await readFile(path.join(__dirname, '../fixtures/test-image.jpg')) },
+    ])
+    await expect(this.page.getByText(/Could not convert uncached\.heic:/)).toBeVisible()
+    await expect(this.page.getByText('Added 1 photo', { exact: true })).toBeVisible()
+    return failedDecoder
+  }
+
+  async requestModelOffline() {
+    await this.page.getByRole('switch', { name: 'Smart positioning' }).click()
+    await this.page.getByRole('radio', { name: /^Advanced/ }).check()
+    await expect(this.page.getByText(/Detection model failed to load\. Using/).first()).toBeVisible()
+    const hasNativeDetector = await this.page.evaluate(() => 'FaceDetector' in window)
+    await expect(this.page.getByRole('radio', { name: hasNativeDetector ? /^Standard/ : /^Basic/ })).toBeChecked()
+  }
+
+  async acceptUpdate() {
+    await this.assertUpdateAvailable()
+    await Promise.all([
+      this.page.waitForEvent('load'),
+      this.page.getByRole('button', { name: 'Refresh Now', exact: true }).click(),
+    ])
+    await expect(this.page.getByText('A new version is available')).not.toBeVisible()
+  }
+
+  async assertUpdateAvailable() {
+    const message = this.page.getByText('A new version is available')
+    await expect(message).toBeVisible()
+    // Framer Motion begins translucent; wait for the readable final state.
+    await expect(message.locator('..')).toHaveCSS('opacity', '1')
+  }
+
   async clearAll() {
     await this.page.getByRole('button', { name: 'Clear All', exact: true }).click()
     await this.page.getByRole('button', { name: 'Clear all photos', exact: true }).click()
