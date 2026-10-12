@@ -79,6 +79,11 @@ test.describe('Photo Management', () => {
     await app.editFirstPhotoWithKeyboard()
   })
 
+  test('keyboard swapping and native dragging still reorder photos', async () => {
+    await app.uploadViaHiddenInput(['test-image.jpg', 'test-image-2.jpg'])
+    await app.swapWithKeyboardAndDragBack()
+  })
+
   test('never stores more than the 16-photo session limit', async ({ page }) => {
     const input = page.locator('input[type="file"][accept^="image/"]')
     await input.setInputFiles(Array.from({ length: 17 }, () => 'test-image.jpg').map((filePath) =>

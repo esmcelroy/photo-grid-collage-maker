@@ -545,8 +545,10 @@ function App() {
     if (open || !editingArea) return
 
     const area = editingArea
+    const originalProject = collageId
     setEditingArea(null)
     requestAnimationFrame(() => {
+      if (collageIdRef.current !== originalProject) return
       document.querySelector<HTMLButtonElement>(`[data-edit-photo-area="${area}"]`)?.focus()
     })
   }

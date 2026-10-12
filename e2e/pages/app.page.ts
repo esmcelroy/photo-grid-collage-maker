@@ -1,4 +1,4 @@
-import { Download, expect, Page } from '@playwright/test'
+import { Download, expect, Page, type Locator } from '@playwright/test'
 import * as path from 'path'
 
 const __dirname = new URL('.', import.meta.url).pathname
@@ -225,7 +225,7 @@ export class AppPage {
   async editFirstPhotoWithKeyboard() {
     const editAction = this.page.getByRole('button', { name: 'Edit photo in slot a' })
 
-    await this.tabTo('Photo slot a, click or drag to reorder')
+    await this.tabTo(this.page.getByRole('button', { name: 'Photo slot a, click or drag to reorder', exact: true }))
     await this.page.keyboard.press('Tab')
     await expect(this.page.locator(':focus')).toHaveAttribute('aria-label', 'Edit photo in slot a')
     await this.page.keyboard.press('Tab')
@@ -241,26 +241,58 @@ export class AppPage {
     await expect(dialog).toBeVisible()
     await expect.poll(() => dialog.evaluate(element => element.contains(document.activeElement))).toBe(true)
 
-    await this.page.getByRole('button', { name: 'Rotate clockwise', exact: true }).focus()
+    await this.tabTo(this.page.getByRole('button', { name: 'Rotate clockwise', exact: true }))
     await this.page.keyboard.press('Enter')
     const sliders = dialog.getByRole('slider')
-    await sliders.nth(0).focus()
+    await this.tabTo(sliders.nth(0))
     await this.page.keyboard.press('ArrowRight')
-    await sliders.nth(1).focus()
+    await this.tabTo(sliders.nth(1))
     await this.page.keyboard.press('ArrowRight')
-    await this.page.getByRole('button', { name: 'Apply', exact: true }).focus()
+    await this.tabTo(this.page.getByRole('button', { name: 'Apply', exact: true }))
     await this.page.keyboard.press('Enter')
 
     await expect(editAction).toBeFocused()
     await this.assertEditedPhoto()
   }
 
-  private async tabTo(accessibleName: string) {
+  async swapWithKeyboardAndDragBack() {
+    const firstPhoto = this.page.locator('[data-grid-area="a"] img')
+    const secondPhoto = this.page.locator('[data-grid-area="b"] img')
+    const firstSource = await firstPhoto.getAttribute('src')
+    const secondSource = await secondPhoto.getAttribute('src')
+    expect(firstSource).not.toBe(secondSource)
+    await this.tabTo(this.page.getByRole('button', { name: 'Photo slot a, click or drag to reorder', exact: true }))
+    await this.page.keyboard.press('Enter')
+    await this.page.keyboard.press('Tab') // Edit a
+    await this.page.keyboard.press('Escape') // Cancel selection from edit control
+    await this.page.keyboard.press('Tab') // Swap b
+    await this.page.keyboard.press('Space') // Select b, without swapping
+    await expect(firstPhoto).toHaveAttribute('src', firstSource!)
+    await expect(secondPhoto).toHaveAttribute('src', secondSource!)
+    await this.page.keyboard.press('Space') // Deselect b
+    await this.page.keyboard.press('Shift+Tab')
+    await this.page.keyboard.press('Shift+Tab') // Swap a
+    await this.page.keyboard.press('Enter')
+    await this.page.keyboard.press('Tab') // Edit a
+    await this.page.keyboard.press('Tab') // Swap b
+    await this.page.keyboard.press('Space')
+    await expect(firstPhoto).toHaveAttribute('src', secondSource!)
+    await expect(secondPhoto).toHaveAttribute('src', firstSource!)
+
+    await this.page.getByRole('button', { name: /^Photo slot a,/ }).dragTo(
+      this.page.getByRole('button', { name: /^Photo slot b,/ }),
+      { sourcePosition: { x: 12, y: 12 }, targetPosition: { x: 12, y: 12 } },
+    )
+    await expect(firstPhoto).toHaveAttribute('src', firstSource!)
+    await expect(secondPhoto).toHaveAttribute('src', secondSource!)
+  }
+
+  private async tabTo(target: Locator) {
     for (let index = 0; index < 40; index += 1) {
       await this.page.keyboard.press('Tab')
-      if (await this.page.locator(':focus').getAttribute('aria-label') === accessibleName) return
+      if (await target.evaluate(element => element === document.activeElement)) return
     }
-    throw new Error(`Could not reach ${accessibleName} with sequential Tab navigation`)
+    throw new Error(`Could not reach ${target} with sequential Tab navigation`)
   }
 
   async assertEditedPhoto() {

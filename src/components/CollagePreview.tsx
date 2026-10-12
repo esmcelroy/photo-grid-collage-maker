@@ -254,6 +254,7 @@ export function CollagePreview({
               onTouchStart={(e) => handleTouchStart(e, area)}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
+              onKeyDown={handleSlotKeyDown}
               onFocus={() => setFocusedArea(area)}
               onBlur={(e) => {
                 if (!e.currentTarget.contains(e.relatedTarget)) setFocusedArea(null)
@@ -288,7 +289,6 @@ export function CollagePreview({
                     type="button"
                     className="absolute inset-0 cursor-move focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
                     onClick={() => handleSlotClick(area)}
-                    onKeyDown={handleSlotKeyDown}
                     aria-label={
                       isSelected
                         ? `Photo slot ${area}, selected — click another slot to swap`

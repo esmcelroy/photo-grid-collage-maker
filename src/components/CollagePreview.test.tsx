@@ -1,5 +1,6 @@
-import { jest } from '@jest/globals'
+import { jest, describe, it, expect } from '@jest/globals'
 import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { axe } from 'jest-axe'
 import { CollagePreview } from '@/components/CollagePreview'
 import type { GridLayout, PhotoPosition, UploadedPhoto, CollageSettings } from '@/lib/types'
@@ -236,25 +237,14 @@ describe('CollagePreview', () => {
   // ─── Keyboard accessibility ─────────────────────────────────────────────
 
   describe('keyboard accessibility', () => {
-    it('swaps photos when activating two slot buttons', () => {
-      const { container, onPositionsChange } = renderPreview()
+    it('swaps photos when activating two slot buttons with Enter', async () => {
+      const user = userEvent.setup()
+      const { onPositionsChange } = renderPreview()
 
-      const slots = container.querySelectorAll('[aria-label^="Photo slot"]')
-      fireEvent.click(slots[0])
-      fireEvent.click(slots[1])
-
-      expect(onPositionsChange).toHaveBeenCalledWith([
-        { photoId: 'p2', gridArea: 'a' },
-        { photoId: 'p1', gridArea: 'b' },
-      ])
-    })
-
-    it('uses native button semantics for space activation', () => {
-      const { container, onPositionsChange } = renderPreview()
-
-      const slots = container.querySelectorAll('[aria-label^="Photo slot"]')
-      fireEvent.click(slots[0])
-      fireEvent.click(slots[1])
+      await user.tab()
+      await user.keyboard('{Enter}')
+      await user.tab()
+      await user.keyboard('{Enter}')
 
       expect(onPositionsChange).toHaveBeenCalledWith([
         { photoId: 'p2', gridArea: 'a' },
@@ -262,13 +252,31 @@ describe('CollagePreview', () => {
       ])
     })
 
-    it('cancels selection with Escape key', () => {
-      const { container, onPositionsChange } = renderPreview()
+    it('uses native button semantics for space activation', async () => {
+      const user = userEvent.setup()
+      const { onPositionsChange } = renderPreview()
 
-      const slots = container.querySelectorAll('[aria-label^="Photo slot"]')
-      fireEvent.click(slots[0]) // Select
-      fireEvent.keyDown(slots[0], { key: 'Escape' }) // Cancel
-      fireEvent.click(slots[1]) // Select b (not swap)
+      await user.tab()
+      await user.keyboard(' ')
+      await user.tab()
+      await user.keyboard(' ')
+
+      expect(onPositionsChange).toHaveBeenCalledWith([
+        { photoId: 'p2', gridArea: 'a' },
+        { photoId: 'p1', gridArea: 'b' },
+      ])
+    })
+
+    it('cancels selection with Escape while focused on an edit action', async () => {
+      const user = userEvent.setup()
+      const { onPositionsChange } = renderPreview({ onEditPhoto: jest.fn() })
+
+      await user.tab()
+      await user.keyboard('{Enter}') // Select a
+      await user.tab() // Edit a
+      await user.keyboard('{Escape}') // Cancel selection
+      await user.tab() // Slot b
+      await user.keyboard('{Enter}') // Select b (not swap)
 
       // No swap should occur — Escape cancelled the first selection
       expect(onPositionsChange).not.toHaveBeenCalled()
