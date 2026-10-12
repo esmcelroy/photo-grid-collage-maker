@@ -541,6 +541,18 @@ function App() {
     setEditingArea(area)
   }
 
+  const handleEditDialogOpenChange = (open: boolean) => {
+    if (open || !editingArea) return
+
+    const area = editingArea
+    const originalProject = collageId
+    setEditingArea(null)
+    requestAnimationFrame(() => {
+      if (collageIdRef.current !== originalProject) return
+      document.querySelector<HTMLButtonElement>(`[data-edit-photo-area="${area}"]`)?.focus()
+    })
+  }
+
   const handleApplyEdit = async (updatedPosition: PhotoPosition) => {
     cancelPendingAutoPosition()
     pushSnapshot(getCurrentSnapshot())
@@ -1013,7 +1025,7 @@ function App() {
         <PhotoEditDialog
           key={collageId}
           open={!!editingArea}
-          onOpenChange={(open) => { if (!open) setEditingArea(null) }}
+          onOpenChange={handleEditDialogOpenChange}
           photo={editingPhoto}
           position={editingPosition}
           onApply={handleApplyEdit}
