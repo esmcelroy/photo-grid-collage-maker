@@ -71,11 +71,15 @@ export function useCollageApi() {
   // Ref always holds latest sessionId for use inside mutation closures
   const sessionIdRef = useRef(sessionId)
   sessionIdRef.current = sessionId
+  const sessionGenerationRef = useRef(0)
 
   const setSessionId = useCallback((id: string) => {
+    sessionGenerationRef.current += 1
+    sessionIdRef.current = id
     writeSessionId(id)
     setSessionIdState(id)
   }, [])
+  const refreshProjects = useCallback(() => queryClient.invalidateQueries({ queryKey: ['projects'] }), [queryClient])
 
   const queryKey = ['collage', sessionId]
 
@@ -92,9 +96,10 @@ export function useCollageApi() {
   })
 
   const initMutation = useMutation({
-    mutationFn: collageDb.createCollage,
-    onSuccess: (data) => {
-      setSessionId(data.id)
+    mutationFn: (_generation: number) => collageDb.createCollage(),
+    onSuccess: (data, generation) => {
+      if (generation === sessionGenerationRef.current) setSessionId(data.id)
+      return refreshProjects()
     },
   })
 
@@ -112,12 +117,15 @@ export function useCollageApi() {
           photos: [...current.photos, dbPhotoToUploadedPhoto(dbPhoto)],
         }
       })
+      return refreshProjects()
     },
   })
 
   const removePhotoMutation = useMutation({
     mutationFn: ({ collageId, photoId }: { collageId: string; photoId: string }) => collageDb.removePhoto(collageId, photoId),
-    onSuccess: (_, { collageId }) => queryClient.invalidateQueries({ queryKey: ['collage', collageId] }),
+    onSuccess: (_, { collageId }) => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['collage', collageId] }), refreshProjects(),
+    ]),
   })
 
   const updateLayoutMutation = useMutation({
@@ -125,6 +133,7 @@ export function useCollageApi() {
     onSuccess: (data, { collageId }) => {
       const key = ['collage', collageId]
       queryClient.setQueryData(key, { ...data, photos: data.photos.map(dbPhotoToUploadedPhoto) })
+      return refreshProjects()
     },
   })
 
@@ -133,6 +142,7 @@ export function useCollageApi() {
     onSuccess: (data, { collageId }) => {
       const key = ['collage', collageId]
       queryClient.setQueryData(key, { ...data, photos: data.photos.map(dbPhotoToUploadedPhoto) })
+      return refreshProjects()
     },
   })
 
@@ -141,19 +151,21 @@ export function useCollageApi() {
     onSuccess: (data, { collageId }) => {
       const key = ['collage', collageId]
       queryClient.setQueryData(key, { ...data, photos: data.photos.map(dbPhotoToUploadedPhoto) })
+      return refreshProjects()
     },
   })
 
   const clearAllMutation = useMutation({
-    mutationFn: async () => {
-      const currentId = sessionIdRef.current
-      const { id } = currentId
-        ? await collageDb.replaceCollage(currentId)
+    mutationFn: async ({ collageId, generation }: { collageId: string | null; generation: number }) => {
+      const { id } = collageId
+        ? await collageDb.replaceCollage(collageId)
         : await collageDb.createCollage()
-      setSessionId(id)
-      return { id }
+      return { id, generation }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['collage'] }),
+    onSuccess: ({ id, generation }) => {
+      if (generation === sessionGenerationRef.current) setSessionId(id)
+      return Promise.all([queryClient.invalidateQueries({ queryKey: ['collage'] }), refreshProjects()])
+    },
   })
 
   // Use refs for mutation objects to stabilize callbacks
@@ -172,26 +184,35 @@ export function useCollageApi() {
   const clearAllMutationRef = useRef(clearAllMutation)
   clearAllMutationRef.current = clearAllMutation
 
-  const initCollage = useCallback(() => initMutationRef.current.mutateAsync(undefined), [])
+  const initCollage = useCallback(() => initMutationRef.current.mutateAsync(sessionGenerationRef.current), [])
   const updateLayout = useCallback(
     (selectedLayoutId: string | null, photoPositions: PhotoPosition[]) =>
-      updateLayoutMutationRef.current.mutateAsync({ collageId: sessionIdRef.current!, selectedLayoutId, photoPositions }),
-    []
+      updateLayoutMutationRef.current.mutateAsync({ collageId: sessionId!, selectedLayoutId, photoPositions }),
+    [sessionId]
   )
   const updatePositions = useCallback(
     (photoPositions: PhotoPosition[]) =>
-      updatePositionsMutationRef.current.mutateAsync({ collageId: sessionIdRef.current!, photoPositions }),
-    []
+      updatePositionsMutationRef.current.mutateAsync({ collageId: sessionId!, photoPositions }),
+    [sessionId]
   )
   const updateSettings = useCallback(
-    (settings: CollageSettings) => updateSettingsMutationRef.current.mutateAsync({ collageId: sessionIdRef.current!, settings }),
-    []
+    (settings: CollageSettings) => updateSettingsMutationRef.current.mutateAsync({ collageId: sessionId!, settings }),
+    [sessionId]
   )
-  const recoverSession = useCallback(() => initMutationRef.current.mutateAsync(undefined), [])
+  const recoverSession = initCollage
   const retry = useCallback(() => refetch(), [refetch])
   const sessionError = error
     ? { kind: error instanceof MissingCollageError ? 'missing' as const : 'read' as const, error }
     : null
+
+  const selectCreatedProject = async (creation: Promise<{ id: string }>) => {
+    const generation = sessionGenerationRef.current
+    const { id } = await creation
+    const state = await fetchCollageFromDb(id)
+    queryClient.setQueryData(['collage', id], state)
+    if (generation === sessionGenerationRef.current) setSessionId(id)
+    await refreshProjects()
+  }
 
   return {
     // State
@@ -209,25 +230,41 @@ export function useCollageApi() {
     // Actions
     initCollage,
     addPhoto: (photo: { id: string; dataUrl: string; fileName: string }) => {
-      const currentId = sessionIdRef.current
+      const currentId = sessionId
       if (!currentId) return Promise.reject(new Error('No active collage'))
       return addPhotoMutationRef.current.mutateAsync({ collageId: currentId, photo })
     },
-    removePhoto: (photoId: string) => removePhotoMutationRef.current.mutateAsync({ collageId: sessionIdRef.current!, photoId }),
+    removePhoto: (photoId: string) => removePhotoMutationRef.current.mutateAsync({ collageId: sessionId!, photoId }),
     updateLayout,
     updatePositions,
     updateSettings,
-    clearAll: () => clearAllMutationRef.current.mutateAsync(),
+    clearAll: () => clearAllMutationRef.current.mutateAsync({ collageId: sessionId, generation: sessionGenerationRef.current }),
     recoverSession,
     retryInitialization: initCollage,
     retry,
+    projectName: collageState?.name ?? 'Untitled collage',
     projects: projectsQuery.data ?? [],
-    createProject: async (name: string) => { const project = await collageDb.createCollage(name); setSessionId(project.id); await queryClient.invalidateQueries({ queryKey: ['projects'] }) },
-    openProject: (id: string) => setSessionId(id),
+    projectsLoading: projectsQuery.isLoading,
+    projectsError: projectsQuery.error,
+    retryProjects: projectsQuery.refetch,
+    createProject: (name: string) => selectCreatedProject(collageDb.createCollage(name)),
+    openProject: async (id: string) => {
+      const generation = ++sessionGenerationRef.current
+      const state = await fetchCollageFromDb(id)
+      queryClient.setQueryData(['collage', id], state)
+      if (generation === sessionGenerationRef.current) setSessionId(id)
+    },
     renameProject: async (id: string, name: string) => { await collageDb.updateCollage(id, { name }); await queryClient.invalidateQueries({ queryKey: ['projects'] }); await queryClient.invalidateQueries({ queryKey: ['collage', id] }) },
-    duplicateProject: async (id: string) => { const project = await collageDb.duplicateCollage(id); setSessionId(project.id); await queryClient.invalidateQueries({ queryKey: ['projects'] }) },
-    deleteProject: async (id: string) => { await collageDb.deleteCollage(id); await queryClient.invalidateQueries({ queryKey: ['projects'] }); if (sessionIdRef.current === id) { const next = await collageDb.createCollage(); setSessionId(next.id) } },
-    exportProject: () => collageDb.exportProject(sessionIdRef.current!),
-    importProject: async (backup: unknown) => { const project = await collageDb.importProject(backup); setSessionId(project.id); await queryClient.invalidateQueries({ queryKey: ['projects'] }) },
+    duplicateProject: (id: string) => selectCreatedProject(collageDb.duplicateCollage(id)),
+    deleteProject: async (id: string) => {
+      if (sessionIdRef.current === id) {
+        await selectCreatedProject(collageDb.replaceCollage(id))
+      } else {
+        await collageDb.deleteCollage(id)
+        await refreshProjects()
+      }
+    },
+    exportProject: () => collageDb.exportProject(sessionId!),
+    importProject: (backup: unknown) => selectCreatedProject(collageDb.importProject(backup)),
   }
 }

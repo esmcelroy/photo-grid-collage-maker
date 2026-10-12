@@ -75,7 +75,7 @@ test.describe('Photo Management', () => {
   })
 
   test('never stores more than the 16-photo session limit', async ({ page }) => {
-    const input = page.locator('input[type="file"]')
+    const input = page.locator('input[type="file"][accept^="image/"]')
     await input.setInputFiles(Array.from({ length: 17 }, () => 'test-image.jpg').map((filePath) =>
       new URL(`./fixtures/${filePath}`, import.meta.url).pathname
     ))

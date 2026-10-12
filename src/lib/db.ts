@@ -111,7 +111,7 @@ export async function createCollage(name = 'Untitled collage'): Promise<{ id: st
   const now = new Date().toISOString()
   await db.collages.add({
     id,
-    name,
+    name: name.trim().slice(0, 200) || 'Untitled collage',
     selectedLayoutId: null,
     settings: { ...DEFAULT_SETTINGS },
     createdAt: now,
@@ -121,26 +121,26 @@ export async function createCollage(name = 'Untitled collage'): Promise<{ id: st
 }
 
 export async function getCollageState(id: string): Promise<CollageState | null> {
-  const collage = await db.collages.get(id)
-  if (!collage) return null
-
-  const photos = await db.photos.where('collageId').equals(id).toArray()
-  const positions = await db.photoPositions.where('collageId').equals(id).toArray()
-
-  return {
-    id: collage.id,
-    name: collage.name || 'Untitled collage',
-    photos: photos.map((p) => ({ id: p.id, fileName: p.fileName, dataUrl: p.dataUrl })),
-    selectedLayoutId: collage.selectedLayoutId,
-    photoPositions: positions.map((p) => ({
-      photoId: p.photoId,
-      gridArea: p.gridArea,
-      ...(p.objectPosition !== undefined && { objectPosition: p.objectPosition }),
-      ...(p.rotation !== undefined && { rotation: p.rotation }),
-      ...(p.scale !== undefined && { scale: p.scale }),
-    })),
-    settings: collage.settings,
-  }
+  return db.transaction('r', [db.collages, db.photos, db.photoPositions], async () => {
+    const collage = await db.collages.get(id)
+    if (!collage) return null
+    const photos = await db.photos.where('collageId').equals(id).toArray()
+    const positions = await db.photoPositions.where('collageId').equals(id).toArray()
+    return {
+      id: collage.id,
+      name: collage.name || 'Untitled collage',
+      photos: photos.map((p) => ({ id: p.id, fileName: p.fileName, dataUrl: p.dataUrl })),
+      selectedLayoutId: collage.selectedLayoutId,
+      photoPositions: positions.map((p) => ({
+        photoId: p.photoId,
+        gridArea: p.gridArea,
+        ...(p.objectPosition !== undefined && { objectPosition: p.objectPosition }),
+        ...(p.rotation !== undefined && { rotation: p.rotation }),
+        ...(p.scale !== undefined && { scale: p.scale }),
+      })),
+      settings: collage.settings,
+    }
+  })
 }
 
 export async function updateCollage(
@@ -164,7 +164,7 @@ export async function updateCollage(
     if (updates.settings !== undefined) {
       patch.settings = updates.settings
     }
-    if (updates.name !== undefined) patch.name = updates.name.trim() || 'Untitled collage'
+    if (updates.name !== undefined) patch.name = updates.name.trim().slice(0, 200) || 'Untitled collage'
 
     await db.collages.update(id, patch)
 
@@ -191,53 +191,88 @@ export async function updateCollage(
   return state
 }
 
-export interface ProjectSummary { id: string; name: string; updatedAt: string; photoCount: number; preview?: string }
+export interface ProjectSummary {
+  id: string
+  name: string
+  updatedAt: string
+  photoCount: number
+  preview?: string
+}
 export async function listProjects(): Promise<ProjectSummary[]> {
-  const collages = await db.collages.orderBy('updatedAt').reverse().toArray()
-  return Promise.all(collages.map(async collage => {
-    const photos = await db.photos.where('collageId').equals(collage.id).toArray()
-    return { id: collage.id, name: collage.name || 'Untitled collage', updatedAt: collage.updatedAt, photoCount: photos.length, preview: photos[0]?.dataUrl }
-  }))
+  return db.transaction('r', [db.collages, db.photos], async () => {
+    const collages = await db.collages.orderBy('updatedAt').reverse().toArray()
+    return Promise.all(collages.map(async collage => {
+      const photos = db.photos.where('collageId').equals(collage.id)
+      const [photoCount, first] = await Promise.all([photos.count(), photos.clone().first()])
+      return { id: collage.id, name: collage.name, updatedAt: collage.updatedAt, photoCount, preview: first?.dataUrl }
+    }))
+  })
 }
 
 export async function duplicateCollage(id: string, name?: string): Promise<{ id: string }> {
   const source = await getCollageState(id)
   if (!source) throw new Error('Collage not found')
-  return importProject({ version: 1, project: { ...source, id: generateId(), name: name || `${source.name} copy` } })
+  return importProject({ version: 1, project: { ...source, name: name || `${source.name?.slice(0, 195)} copy` } })
 }
 
 export interface ProjectBackup { version: 1; project: CollageState }
-const MAX_BACKUP_BYTES = 50 * 1024 * 1024
+export const MAX_BACKUP_BYTES = 50 * 1024 * 1024
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 function isSettings(value: unknown): value is CollageSettings {
   return isRecord(value) && typeof value.gap === 'number' && Number.isFinite(value.gap) && value.gap >= 0 && value.gap <= 100
-    && typeof value.backgroundColor === 'string' && value.backgroundColor.length <= 100
+    && typeof value.backgroundColor === 'string' && /^(transparent|#[\da-f]{3}|#[\da-f]{6}|#[\da-f]{8})$/i.test(value.backgroundColor)
     && typeof value.borderRadius === 'number' && Number.isFinite(value.borderRadius) && value.borderRadius >= 0 && value.borderRadius <= 100
 }
 export function validateProjectBackup(value: unknown): asserts value is ProjectBackup {
   if (!isRecord(value) || value.version !== 1 || !isRecord(value.project)) throw new Error('Unsupported backup format version')
+  if (new Blob([JSON.stringify(value)]).size > MAX_BACKUP_BYTES) throw new Error('Backup file is too large (maximum 50 MiB)')
   const project = value.project
-  if (typeof project.name !== 'string' || project.name.length > 200 || !Array.isArray(project.photos) || !Array.isArray(project.photoPositions) || project.photos.length > MAX_PHOTOS || !isSettings(project.settings) || !(typeof project.selectedLayoutId === 'string' || project.selectedLayoutId === null)) throw new Error('Backup has invalid project data')
+  if (typeof project.id !== 'string' || !project.id
+    || typeof project.name !== 'string' || project.name.length > 200
+    || !Array.isArray(project.photos) || project.photos.length > MAX_PHOTOS
+    || !Array.isArray(project.photoPositions) || !isSettings(project.settings)
+    || !(typeof project.selectedLayoutId === 'string' || project.selectedLayoutId === null)) {
+    throw new Error('Backup has invalid project data')
+  }
   const ids = new Set<string>()
   for (const photo of project.photos) {
-    if (!isRecord(photo) || typeof photo.id !== 'string' || !photo.id || ids.has(photo.id) || typeof photo.fileName !== 'string' || !photo.fileName || typeof photo.dataUrl !== 'string' || !/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(photo.dataUrl)) throw new Error('Backup contains an invalid photo')
+    if (!isRecord(photo) || typeof photo.id !== 'string' || !photo.id || ids.has(photo.id)
+      || typeof photo.fileName !== 'string' || !photo.fileName || typeof photo.dataUrl !== 'string'
+      || !/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(photo.dataUrl)
+      || photo.dataUrl.split(',')[1].length % 4 !== 0) throw new Error('Backup contains an invalid photo')
     ids.add(photo.id)
   }
   const layout = project.selectedLayoutId === null ? null : GRID_LAYOUTS.find(candidate => candidate.id === project.selectedLayoutId)
-  if ((project.photos.length === 0 && project.selectedLayoutId !== null) || (project.photos.length > 0 && (!layout || layout.photoCount !== project.photos.length))) throw new Error('Backup layout is incompatible with its photos')
+  if (project.selectedLayoutId !== null && (!layout || layout.photoCount !== project.photos.length)) throw new Error('Backup layout is incompatible with its photos')
   const areas = new Set(layout?.areas.flatMap(row => row.split(/\s+/)) ?? [])
   const seenAreas = new Set<string>()
+  const seenPhotos = new Set<string>()
   for (const position of project.photoPositions) {
-    if (!isRecord(position) || typeof position.photoId !== 'string' || !ids.has(position.photoId) || typeof position.gridArea !== 'string' || !areas.has(position.gridArea) || seenAreas.has(position.gridArea) || (position.objectPosition !== undefined && typeof position.objectPosition !== 'string') || (position.rotation !== undefined && (typeof position.rotation !== 'number' || !Number.isFinite(position.rotation) || position.rotation < -360 || position.rotation > 360)) || (position.scale !== undefined && (typeof position.scale !== 'number' || !Number.isFinite(position.scale) || position.scale < 0.1 || position.scale > 10))) throw new Error('Backup contains invalid photo transforms')
+    if (!isRecord(position)
+      || typeof position.photoId !== 'string' || !ids.has(position.photoId) || seenPhotos.has(position.photoId)
+      || typeof position.gridArea !== 'string' || !areas.has(position.gridArea) || seenAreas.has(position.gridArea)
+      || (position.objectPosition !== undefined && (typeof position.objectPosition !== 'string'
+        || !/^(100|\d{1,2})(\.\d+)?% (100|\d{1,2})(\.\d+)?%$/.test(position.objectPosition)
+        || position.objectPosition.split(' ').some(value => parseFloat(value) > 100)))
+      || (position.rotation !== undefined && (typeof position.rotation !== 'number'
+        || !Number.isFinite(position.rotation) || position.rotation < -360 || position.rotation > 360))
+      || (position.scale !== undefined && (typeof position.scale !== 'number'
+        || !Number.isFinite(position.scale) || position.scale < 0.1 || position.scale > 10))) {
+      throw new Error('Backup contains invalid photo transforms')
+    }
     seenAreas.add(position.gridArea)
+    seenPhotos.add(position.photoId)
   }
+  if (seenAreas.size !== areas.size) throw new Error('Backup is missing photo slots')
 }
 export async function exportProject(id: string): Promise<ProjectBackup> {
   const project = await getCollageState(id)
   if (!project) throw new Error('Collage not found')
-  return { version: 1, project }
+  const backup: ProjectBackup = { version: 1, project }
+  validateProjectBackup(backup)
+  return backup
 }
 export async function importProject(backup: unknown): Promise<{ id: string }> {
   validateProjectBackup(backup)
@@ -247,8 +282,13 @@ export async function importProject(backup: unknown): Promise<{ id: string }> {
   const now = new Date().toISOString()
   await db.transaction('rw', [db.collages, db.photos, db.photoPositions], async () => {
     await db.collages.add({ id, name: project.name?.trim() || 'Imported collage', selectedLayoutId: project.selectedLayoutId, settings: project.settings, createdAt: now, updatedAt: now })
-    await db.photos.bulkAdd(project.photos.map(photo => ({ ...photo, id: photoIds.get(photo.id)!, collageId: id, createdAt: now })))
-    await db.photoPositions.bulkAdd(project.photoPositions.map(position => ({ ...position, photoId: photoIds.get(position.photoId)!, collageId: id })))
+    await db.photos.bulkAdd(project.photos.map(photo => ({ id: photoIds.get(photo.id)!, fileName: photo.fileName, dataUrl: photo.dataUrl, collageId: id, createdAt: now })))
+    await db.photoPositions.bulkAdd(project.photoPositions.map(position => ({
+      photoId: photoIds.get(position.photoId)!, collageId: id, gridArea: position.gridArea,
+      ...(position.objectPosition !== undefined && { objectPosition: position.objectPosition }),
+      ...(position.rotation !== undefined && { rotation: position.rotation }),
+      ...(position.scale !== undefined && { scale: position.scale }),
+    })))
   })
   return { id }
 }
@@ -310,7 +350,7 @@ export async function replaceCollage(id: string): Promise<{ id: string }> {
     await db.collages.delete(id)
     await db.collages.add({
       id: newId,
-    name: 'Untitled collage',
+      name: 'Untitled collage',
       selectedLayoutId: null,
       settings: { ...DEFAULT_SETTINGS },
       createdAt: now,

@@ -110,7 +110,8 @@ function App() {
     updatePositions,
     updateSettings,
     clearAll,
-    projects, createProject, openProject, renameProject, duplicateProject, deleteProject, exportProject, importProject,
+    projectName, projects, projectsLoading, projectsError, retryProjects,
+    createProject, openProject, renameProject, duplicateProject, deleteProject, exportProject, importProject,
   } = useCollageApi()
 
   const { canUndo, canRedo, pushSnapshot, undo, redo, setRestoring, clear: clearHistory } = useCollageHistory()
@@ -164,13 +165,18 @@ function App() {
     completedAutoPositionRequestRef.current = autoPositionRequest
   }, [autoPositionRequest])
 
+  const previousProject = useRef(collageId)
   useEffect(() => {
+    if (previousProject.current === collageId) return
+    previousProject.current = collageId
     clearHistory()
     setEditingArea(null)
+    setShowCarousel(false)
+    setCompareIds([])
+    setClearDialogOpen(false)
+    setRestoring(false)
     cancelPendingAutoPosition()
-    // Project identity is the isolation boundary; history callbacks are stable in production.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collageId])
+  }, [collageId, clearHistory, setRestoring, cancelPendingAutoPosition])
 
   const handleSmartPositionToggle = useCallback(() => {
     const nextEnabled = !smartPositionEnabled
@@ -516,13 +522,14 @@ function App() {
 
   const handleClearAll = async () => {
     cancelPendingAutoPosition()
+    const originalProject = collageId
     try {
       if (settingsTimerRef.current) {
         clearTimeout(settingsTimerRef.current)
         settingsTimerRef.current = null
       }
       await clearAll()
-      clearHistory()
+      if (collageIdRef.current === originalProject) clearHistory()
       toast.success('All photos cleared')
     } catch (error) {
       toast.error(isQuotaExceededError(error) ? 'Storage is full. Your existing photos were kept.' : 'Could not clear this collage. Your photos were kept.')
@@ -550,6 +557,7 @@ function App() {
   const handleUndo = useCallback(async () => {
     const snapshot = undo(getCurrentSnapshot())
     if (!snapshot) return
+    const originalProject = collageId
     cancelPendingAutoPosition()
     setRestoring(true)
     try {
@@ -558,13 +566,14 @@ function App() {
       }
       await updateSettings(snapshot.settings)
     } finally {
-      setRestoring(false)
+      if (collageIdRef.current === originalProject) setRestoring(false)
     }
-  }, [undo, getCurrentSnapshot, setRestoring, updateLayout, updateSettings, cancelPendingAutoPosition])
+  }, [collageId, undo, getCurrentSnapshot, setRestoring, updateLayout, updateSettings, cancelPendingAutoPosition])
 
   const handleRedo = useCallback(async () => {
     const snapshot = redo(getCurrentSnapshot())
     if (!snapshot) return
+    const originalProject = collageId
     cancelPendingAutoPosition()
     setRestoring(true)
     try {
@@ -573,9 +582,9 @@ function App() {
       }
       await updateSettings(snapshot.settings)
     } finally {
-      setRestoring(false)
+      if (collageIdRef.current === originalProject) setRestoring(false)
     }
-  }, [redo, getCurrentSnapshot, setRestoring, updateLayout, updateSettings, cancelPendingAutoPosition])
+  }, [collageId, redo, getCurrentSnapshot, setRestoring, updateLayout, updateSettings, cancelPendingAutoPosition])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -765,7 +774,10 @@ function App() {
             </div>
           </div>
         </header>
-        <ProjectLibrary projects={projects} activeId={collageId} onOpen={openProject} onCreate={createProject} onRename={renameProject} onDuplicate={duplicateProject} onDelete={deleteProject} onExport={exportProject} onImport={importProject} />
+        <ProjectLibrary projects={projects} activeId={collageId} activeName={projectName}
+          loading={projectsLoading} loadError={projectsError} onRetry={() => { void retryProjects() }}
+          onOpen={openProject} onCreate={createProject} onRename={renameProject} onDuplicate={duplicateProject}
+          onDelete={deleteProject} onExport={exportProject} onImport={importProject} />
 
         <main className="grid lg:grid-cols-3 gap-6 mb-6">
           <div className="lg:col-span-2 space-y-6 min-w-0">
@@ -822,6 +834,7 @@ function App() {
                   <h2 className="text-lg font-semibold">Preview</h2>
                   <div className="hidden lg:block">
                     <ExportDialog
+                      key={collageId}
                       onExport={handleDownload}
                       disabled={!selectedLayout}
                       aspectRatio={getLayoutAspectRatio(selectedLayout)}
@@ -998,6 +1011,7 @@ function App() {
 
       {editingPhoto && editingPosition && (
         <PhotoEditDialog
+          key={collageId}
           open={!!editingArea}
           onOpenChange={(open) => { if (!open) setEditingArea(null) }}
           photo={editingPhoto}
@@ -1009,6 +1023,7 @@ function App() {
       {photos.length > 0 && selectedLayout && (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border p-3 lg:hidden">
           <ExportDialog
+            key={collageId}
             onExport={handleDownload}
             disabled={!selectedLayout}
             aspectRatio={getLayoutAspectRatio(selectedLayout)}
