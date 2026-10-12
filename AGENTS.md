@@ -25,6 +25,15 @@ This is a **fully client-side** application. All data persists in the browser vi
 - Enforce the photo limit atomically with insertion; confirmed Clear All atomically deletes the current collage and its dependent records and creates a replacement
 - Upload batches report actual persisted successes and failures, not attempted file counts; keep overlapping uploads and stale-session completions guarded
 
+## Saved projects and backups
+
+- Dexie v3 adds project names and an `updatedAt` index; migration must preserve existing IDs, photos, settings, and transforms
+- `localStorage` selects the active project, not the only saved project. Bind async edit callbacks and cache writes to their originating project; guard late project creation/activation with the session generation
+- Load destination state before activation. Switching clears history, pending settings timers, comparison/carousel state, and dialog drafts, and invalidates automatic positioning work
+- Duplicate and restore must remap globally keyed photo IDs and their position references. Deletion and import writes must be atomic across all dependent tables
+- Version-1 JSON backups include photos, layout, transforms, and settings. Validate byte size (`MAX_BACKUP_BYTES`), `MAX_PHOTOS`, version, layout/slot/photo references, and settings/transforms before writing; failed imports leave existing projects unchanged
+- Project actions use accessible dialogs, explicit deletion confirmation, pending-state submission guards, and retryable error feedback. Keep backup files and screenshots containing photos out of Git
+
 ## Editing and export contracts
 
 - `MAX_PHOTOS` in `src/lib/types.ts` is the photo-limit source of truth (currently 16)
@@ -56,6 +65,7 @@ This is a **fully client-side** application. All data persists in the browser vi
 - `playwright.production.config.ts` adds desktop WebKit and runs serially because update tests temporarily change generated HTML and its precache revision, restoring both afterward
 - Production tests must exercise real service workers, offline transitions, downloads, and update refreshes; do not mock registration or skip failing browser coverage
 - Verify real downloads by decoding dimensions; compare asymmetric multi-photo exports against native preview rendering when changing export fidelity
+- Photo-picker locators must target image-accepting inputs, not every file input; restore has a separate JSON picker. The shared project journey covers edited backup round trips in development and offline production browsers
 
 ## Accessibility Testing
 

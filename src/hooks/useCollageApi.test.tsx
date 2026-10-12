@@ -19,6 +19,7 @@ jest.unstable_mockModule('@/lib/db', () => ({
   removePhoto: jest.fn(),
   deleteCollage: jest.fn(),
   replaceCollage: jest.fn(),
+  listProjects: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
   db: {},
 }))
 
@@ -70,6 +71,44 @@ describe('useCollageApi', () => {
 
   afterEach(() => {
     localStorage.clear()
+  })
+
+  it('keeps an old multi-step operation bound to its project after switching', async () => {
+    const states = new Map<string, import('@/lib/db').CollageState>(['a', 'b'].map(id => [id, { ...mockCollageState, id }]))
+    localStorage.setItem(SESSION_KEY, 'a')
+    jest.mocked(collageDb.getCollageState).mockImplementation(async id => states.get(id)!)
+    jest.mocked(collageDb.updateCollage).mockImplementation(async (id, patch) => {
+      const state = { ...states.get(id)!, ...patch }
+      states.set(id, state)
+      return state
+    })
+    const { wrapper } = createWrapper()
+    const { result } = renderHook(() => useCollageApi(), { wrapper })
+    await waitFor(() => expect(result.current.photos).toHaveLength(1))
+    const originalOperation = result.current.updateSettings
+    await act(async () => { await result.current.openProject('b') })
+    await waitFor(() => expect(result.current.collageId).toBe('b'))
+    await act(async () => { await originalOperation({ gap: 24, borderRadius: 12, backgroundColor: '#abcdef' }) })
+    expect(states.get('a')!.settings.gap).toBe(24)
+    expect(states.get('b')!.settings.gap).toBe(8)
+    expect(result.current.settings.gap).toBe(8)
+  })
+
+  it('does not reactivate a late-created project after an explicit switch', async () => {
+    localStorage.setItem(SESSION_KEY, 'a')
+    jest.mocked(collageDb.getCollageState).mockImplementation(async id => ({ ...mockCollageState, id }))
+    let finish!: (value: { id: string }) => void
+    jest.mocked(collageDb.createCollage).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const { wrapper } = createWrapper()
+    const { result } = renderHook(() => useCollageApi(), { wrapper })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    let creation!: Promise<void>
+    act(() => { creation = result.current.createProject('Slow creation') })
+    await act(async () => { await result.current.openProject('b') })
+    await act(async () => { finish({ id: 'late' }); await creation })
+    expect(result.current.collageId).toBe('b')
+    expect(localStorage.getItem(SESSION_KEY)).toBe('b')
+    expect(result.current.settings.gap).toBe(8)
   })
 
   describe('when no session exists', () => {

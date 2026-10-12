@@ -77,6 +77,7 @@ jest.unstable_mockModule('@/components/CollagePreview', () => ({
 }))
 jest.unstable_mockModule('@/components/UploadZone', () => ({ UploadZone: () => null }))
 jest.unstable_mockModule('@/components/PhotoThumbnail', () => ({ PhotoThumbnail: () => null }))
+jest.unstable_mockModule('@/components/ProjectLibrary', () => ({ ProjectLibrary: () => null }))
 jest.unstable_mockModule('@/components/LayoutGallery', () => ({ LayoutGallery: () => null }))
 jest.unstable_mockModule('@/components/CustomizationControls', () => ({ CustomizationControls: () => null }))
 jest.unstable_mockModule('@/components/PresetGallery', () => ({ PresetGallery: () => null }))

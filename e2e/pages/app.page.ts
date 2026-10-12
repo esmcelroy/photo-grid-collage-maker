@@ -70,7 +70,7 @@ export class AppPage {
     // Wait for file chooser and click the upload input simultaneously
     const [fileChooser] = await Promise.all([
       this.page.waitForEvent('filechooser'),
-      this.page.locator('input[type="file"]').click(),
+      this.page.locator('input[type="file"][accept^="image/"]').click(),
     ])
 
     await fileChooser.setFiles(absolutePaths)
@@ -84,7 +84,7 @@ export class AppPage {
    * @param filePaths - Array of file paths relative to e2e/fixtures/
    */
   async uploadViaHiddenInput(filePaths: string[]) {
-    const fileInput = this.page.locator('input[type="file"]')
+    const fileInput = this.page.locator('input[type="file"][accept^="image/"]')
     await fileInput.waitFor({ state: 'attached', timeout: 10000 })
     const absolutePaths = filePaths.map(filePath =>
       path.join(__dirname, '../fixtures', filePath)
@@ -223,6 +223,17 @@ export class AppPage {
     await expect(photo).toHaveCSS('transform', 'matrix(0, 1.05, -1.05, 0, 0, 0)')
   }
 
+  async rotateEditedPhotoAgain() {
+    await this.assertEditedPhoto()
+    await this.page.locator('[data-grid-area]').first().hover()
+    await this.page.getByRole('button', { name: /^Edit photo in slot/ }).first().click()
+    await this.page.getByRole('button', { name: 'Rotate clockwise', exact: true }).click()
+    await this.page.getByRole('button', { name: 'Apply', exact: true }).click()
+    const photo = this.page.locator('[data-grid-area]').first().locator('img')
+    await expect(photo).toHaveCSS('object-position', '51% 50%')
+    await expect(photo).toHaveCSS('transform', 'matrix(-1.05, 0, 0, -1.05, 0, 0)')
+  }
+
   async assertOfflineNotice() {
     const notice = this.page.getByText("You're offline — some tools need previously cached downloads.")
     await expect(notice).toBeVisible()
@@ -243,7 +254,7 @@ export class AppPage {
     const failedDecoder = this.page.waitForEvent('requestfailed', {
       predicate: request => /libheif-js-.*\.js/.test(request.url()),
     })
-    await this.page.locator('input[type="file"]').setInputFiles([
+    await this.page.locator('input[type="file"][accept^="image/"]').setInputFiles([
       // The decoder import fails before these bytes can be decoded. This tests
       // unavailable-code feedback, not HEIC decoding or image-format support.
       { name: 'uncached.heic', mimeType: 'image/heic', buffer: Buffer.from('unused offline input') },
@@ -292,5 +303,78 @@ export class AppPage {
     const downloadPromise = this.page.waitForEvent('download')
     await this.page.getByRole('button', { name: /^export$/i }).click()
     return downloadPromise
+  }
+
+  async createProject(name: string) {
+    await this.page.getByRole('button', { name: 'New project', exact: true }).click()
+    await this.page.getByLabel('Project name', { exact: true }).fill(name)
+    await this.page.getByRole('button', { name: 'Create project', exact: true }).click()
+    await this.assertProjectName(name)
+  }
+
+  async assertProjectName(name: string) {
+    await expect(this.page.getByText(`Editing: ${name}`, { exact: true })).toBeVisible()
+    await expect(this.page.getByRole('dialog')).toHaveCount(0)
+  }
+
+  async projectAction(action: 'Open' | 'Rename' | 'Duplicate' | 'Delete', name: string) {
+    await this.page.getByRole('button', { name: 'Manage projects', exact: true }).click()
+    await this.page.getByRole('button', { name: `${action} ${name}`, exact: true }).click()
+  }
+
+  async renameProject(previous: string, name: string) {
+    await this.projectAction('Rename', previous)
+    await this.page.getByLabel('Project name', { exact: true }).fill(name)
+    await this.page.getByRole('button', { name: 'Save name', exact: true }).click()
+    await this.assertProjectName(name)
+  }
+
+  async downloadBackup(): Promise<Download> {
+    const download = this.page.waitForEvent('download')
+    await this.page.getByRole('button', { name: 'Back up', exact: true }).click()
+    return download
+  }
+
+  async restoreBackup(file: string) {
+    const [chooser] = await Promise.all([
+      this.page.waitForEvent('filechooser'),
+      this.page.getByRole('button', { name: 'Restore backup', exact: true }).press('Enter'),
+    ])
+    await chooser.setFiles(file)
+  }
+
+  async confirmProjectDeletion() {
+    await this.page.getByRole('button', { name: 'Delete project', exact: true }).click()
+    await expect(this.page.getByRole('dialog')).toHaveCount(0)
+  }
+
+  async assertUndoUnavailable() {
+    await expect(this.page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled()
+  }
+
+  async assertRestoreError() {
+    await expect(this.page.getByRole('alert')).toContainText('Unsupported backup format version')
+  }
+
+  async captureProjectView(file: string) {
+    const dialog = this.page.getByRole('dialog')
+    if (await dialog.count()) await expect(dialog).toHaveCSS('opacity', '1')
+    else await this.page.getByRole('button', { name: 'Manage projects', exact: true }).scrollIntoViewIfNeeded()
+    await this.page.screenshot({ path: file })
+  }
+
+  async showProjectLibrary() {
+    await this.page.getByRole('button', { name: 'Manage projects', exact: true }).click()
+    await expect(this.page.getByRole('dialog')).toHaveAccessibleName('Saved projects')
+  }
+
+  async showNewProjectForm() {
+    await this.page.getByRole('button', { name: 'New project', exact: true }).click()
+    await expect(this.page.getByLabel('Project name')).toBeFocused()
+  }
+
+  async cancelProjectDialog() {
+    await this.page.getByRole('button', { name: 'Close', exact: true }).click()
+    await expect(this.page.getByRole('dialog')).toHaveCount(0)
   }
 }

@@ -19,6 +19,7 @@ Collage Maker is a browser-based tool for composing photo grid collages. Upload 
 - **Exact-Size Export** — PNG transparency or JPEG with quality controls and a white background; Web/Social/Print presets preserve layout aspect ratio
 - **Offline Support** — installable PWA with service worker caching
 - **Local Storage** — all data persists in IndexedDB; nothing sent to any server
+- **Saved Projects & Backups** — name, reopen, rename, independently duplicate, or delete projects; download and restore portable JSON backups locally
 
 ---
 
@@ -109,12 +110,16 @@ npm run build
 
 All collage state lives in IndexedDB via Dexie.js; photos are stored as data URLs. React Query manages the cache through `useCollageApi`, and `localStorage` identifies the active session. Confirmed Clear All atomically removes that collage and its dependent records and creates a replacement. Clearing browser/site data can still erase saved work; persistence requests are best-effort, not a backup.
 
+Use **New project** to start a separate collage and **Manage projects** to reopen, rename, duplicate, or delete saved work. Existing collages migrate to the library as “Untitled collage.” Switching projects resets undo history and discards unsaved dialog drafts; pending saves and analysis cannot modify the destination project.
+
+**Back up** downloads a version-1 JSON file containing the active project's photos, layout, crop/rotation/zoom, and style settings. **Restore backup** imports it as an independent project without overwriting the original. Backups are limited to 50 MiB and 16 photos; unsupported versions, malformed settings/transforms, and invalid references are rejected before saving. Import write failures roll back the complete project. Backups contain your photos: keep downloaded files private and store them somewhere safe before clearing browser data. There is no automatic cloud backup or synchronization.
+
 Export validates whole-pixel sizes before rendering: each dimension must be 1–8192px and total output must not exceed 40 megapixels. Print presets use a 300-DPI sizing assumption, not guaranteed printer settings. Export waits for image encoding and download initiation; errors remain retryable.
 
 ## Offline and browser support
 
 - A first-ever visit requires a network connection. Wait for the production service worker to install and cache the app before relying on offline reload. The development server does not exercise this production lifecycle.
-- Once installed, cached app assets support JPEG/PNG upload, saved-collage reload, local editing, and PNG/JPEG export offline. Browser storage must remain available.
+- Once installed, cached app assets support JPEG/PNG upload, saved-project management, backup/restore, local editing, and PNG/JPEG export offline. Browser storage must remain available.
 - The large HEIC decoder is not precached. A first HEIC import offline may fail; existing photos stay intact and the failed file is reported. Previously loading it alone does not guarantee offline availability in every browser.
 - Standard/Advanced positioning may need MediaPipe WASM/models from external CDNs. Their downloads are runtime-cached, but cache eviction or first use offline can make them unavailable. The app reports model-load failure and falls back to Standard/native detection or Basic positioning. Basic mode requires no model downloads. Photos are not uploaded to these services.
 - A waiting service-worker update offers **Refresh Now** or **Dismiss**. Refresh updates the app without clearing the saved collage; schema changes still need separate migration coverage.
