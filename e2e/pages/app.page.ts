@@ -383,6 +383,25 @@ export class AppPage {
     return downloadPromise
   }
 
+  async openExportDialog() {
+    await this.page.getByRole('button', { name: /download|export collage/i }).click()
+    await expect(this.page.getByRole('heading', { name: 'Export Collage' })).toBeVisible()
+  }
+
+  async assertNativeTextUndoRedo(input: Locator, suffix: string) {
+    const original = await input.inputValue()
+    await input.focus()
+    await this.page.keyboard.press('End')
+    await this.page.keyboard.type(suffix)
+    await expect(input).toHaveValue(`${original}${suffix}`)
+
+    await this.page.keyboard.press(`${this.shortcutModifier()}+z`)
+    await expect(input).toHaveValue(original)
+
+    await this.page.keyboard.press(`${this.shortcutModifier()}+Shift+z`)
+    await expect(input).toHaveValue(`${original}${suffix}`)
+  }
+
   async createProject(name: string) {
     await this.page.getByRole('button', { name: 'New project', exact: true }).click()
     await this.page.getByLabel('Project name', { exact: true }).fill(name)
@@ -454,5 +473,13 @@ export class AppPage {
   async cancelProjectDialog() {
     await this.page.getByRole('button', { name: 'Close', exact: true }).click()
     await expect(this.page.getByRole('dialog')).toHaveCount(0)
+  }
+
+  async pressCollageUndo() {
+    await this.page.keyboard.press(`${this.shortcutModifier()}+z`)
+  }
+
+  private shortcutModifier() {
+    return process.platform === 'darwin' ? 'Meta' : 'Control'
   }
 }

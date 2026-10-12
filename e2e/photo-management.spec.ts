@@ -84,6 +84,49 @@ test.describe('Photo Management', () => {
     await app.swapWithKeyboardAndDragBack()
   })
 
+  test('preserves native text history in editable descendants and uses collage undo elsewhere', async ({ page }) => {
+    await app.uploadViaHiddenInput(['test-image.jpg'])
+
+    const spacing = page.getByRole('slider', { name: 'Photo spacing' })
+    await spacing.press('ArrowRight')
+    await expect(page.getByText('10px', { exact: true })).toBeVisible()
+
+    await app.openExportDialog()
+    await app.assertNativeTextUndoRedo(page.getByLabel('Filename'), '-draft')
+    await expect(page.getByText('10px', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+    await app.showNewProjectForm()
+    await app.assertNativeTextUndoRedo(page.getByLabel('Project name', { exact: true }), ' draft')
+    await expect(page.getByText('10px', { exact: true })).toBeVisible()
+    await app.cancelProjectDialog()
+
+    await page.evaluate(() => {
+      const probe = document.createElement('div')
+      probe.innerHTML = '<div id="editable-host" contenteditable="true">draft<span id="editable-child" tabindex="0"> child</span><span id="non-editable-child" contenteditable="false" tabindex="0">button</span></div>'
+      document.body.append(probe)
+    })
+
+    const editableHost = page.locator('#editable-host')
+    await editableHost.focus()
+    await page.keyboard.press('End')
+    await page.keyboard.type(' text')
+    await expect(editableHost).toHaveText('draft childbutton text')
+    await app.pressCollageUndo()
+    await expect(editableHost).toHaveText('draft childbutton')
+    await expect(page.getByText('10px', { exact: true })).toBeVisible()
+
+    const editableChild = page.locator('#editable-child')
+    await editableChild.focus()
+    expect(await editableChild.evaluate(element => (element as HTMLElement).isContentEditable)).toBe(true)
+    await app.pressCollageUndo()
+    await expect(page.getByText('10px', { exact: true })).toBeVisible()
+
+    await page.locator('#non-editable-child').focus()
+    await app.pressCollageUndo()
+    await expect(page.getByText('8px', { exact: true })).toBeVisible()
+  })
+
   test('never stores more than the 16-photo session limit', async ({ page }) => {
     const input = page.locator('input[type="file"][accept^="image/"]')
     await input.setInputFiles(Array.from({ length: 17 }, () => 'test-image.jpg').map((filePath) =>
