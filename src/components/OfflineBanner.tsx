@@ -37,11 +37,11 @@ export function OfflineBanner({ isOnline, offlineReady }: OfflineBannerProps) {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -40, opacity: 0 }}
           className={cn(
-            'fixed top-0 left-0 right-0 z-50 flex items-center justify-center py-2 px-4 text-sm font-medium',
+            'relative z-50 flex items-center justify-center py-2 px-4 text-sm font-medium',
             'bg-amber-100 text-amber-900 border-b border-amber-200'
           )}
         >
-          You&apos;re offline — everything still works
+          You&apos;re offline — some tools need previously cached downloads.
         </motion.div>
       )}
       {!showOffline && showReady && (

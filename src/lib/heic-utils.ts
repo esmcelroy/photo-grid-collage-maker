@@ -146,14 +146,13 @@ export async function processFilesForHeic(
     return { converted: files, errors: [] }
   }
 
-  const converted: File[] = []
   const errors: Array<{ fileName: string; error: string }> = []
   let processedCount = 0
 
   // Process up to 3 HEIC files concurrently
   const concurrency = 3
   const queue = files.map((file, i) => ({ file, isHeic: heicCount[i], index: i }))
-  const results = new Array<File>(files.length)
+  const results = new Array<File | undefined>(files.length)
 
   const processItem = async (item: typeof queue[0]) => {
     if (!item.isHeic) {
@@ -170,8 +169,6 @@ export async function processFilesForHeic(
         fileName: item.file.name,
         error: err instanceof Error ? err.message : 'Unknown conversion error',
       })
-      // Still include the original file — it won't display but won't block others
-      results[item.index] = item.file
     }
   }
 
@@ -181,5 +178,5 @@ export async function processFilesForHeic(
     await Promise.all(batch.map(processItem))
   }
 
-  return { converted: results.filter(Boolean), errors }
+  return { converted: results.filter((file): file is File => file !== undefined), errors }
 }

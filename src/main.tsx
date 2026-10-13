@@ -14,7 +14,9 @@ import "./index.css"
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 1, staleTime: 0 },
+    // All queries and mutations use local IndexedDB, not the network.
+    queries: { retry: 1, staleTime: 0, networkMode: 'always' },
+    mutations: { networkMode: 'always' },
   },
 })
 

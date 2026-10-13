@@ -49,7 +49,7 @@ test.describe('File-Picker Upload Proof', () => {
     await app.takeProofScreenshot('file-chooser-result')
 
     // Clear and re-upload via hidden input
-    await page.getByRole('button', { name: /clear all/i }).click()
+    await app.clearAll()
     await expect(page.getByText(/upload photos/i)).toBeVisible()
     // Wait for state to fully settle (IndexedDB cleanup + React re-render)
     await expect(page.getByText('Get Started')).toBeVisible({ timeout: 5000 })

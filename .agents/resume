@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# The application is entirely client-side and has no service or authentication to restore.
+exit 0

@@ -4,7 +4,7 @@
     "version": "0.0.0",
     "type": "module",
     "engines": {
-        "node": ">=18 <21 || >=22"
+        "node": "24.x"
     },
     "scripts": {
         "dev": "vite",
@@ -18,6 +18,7 @@
         "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
         "test:server": "echo 'Server tests removed — app is now fully client-side'",
         "test:ui": "playwright test",
+        "test:production": "playwright test --config playwright.production.config.ts",
         "test:ui:install": "playwright install --with-deps chromium",
         "dev:full": "npm run dev"
     },
@@ -94,7 +95,7 @@
     "devDependencies": {
         "@eslint/js": "^9.21.0",
         "@jest/globals": "^30.3.0",
-        "@playwright/test": "^1.60.0",
+        "@playwright/test": "^1.64.0",
         "@tailwindcss/postcss": "^4.1.8",
         "@testing-library/dom": "^10.4.1",
         "@testing-library/jest-dom": "^6.9.1",
@@ -108,6 +109,7 @@
         "eslint": "^9.28.0",
         "eslint-plugin-react-hooks": "^5.2.0",
         "eslint-plugin-react-refresh": "^0.5.2",
+        "fake-indexeddb": "^6.2.5",
         "globals": "^16.0.0",
         "jest": "^30.3.0",
         "jest-axe": "^10.0.0",

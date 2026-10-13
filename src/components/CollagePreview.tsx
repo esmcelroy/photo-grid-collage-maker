@@ -27,6 +27,7 @@ export function CollagePreview({
   const [draggedArea, setDraggedArea] = useState<string | null>(null)
   const [dragOverArea, setDragOverArea] = useState<string | null>(null)
   const [selectedArea, setSelectedArea] = useState<string | null>(null)
+  const [focusedArea, setFocusedArea] = useState<string | null>(null)
 
   // Touch drag state
   const touchDragRef = useRef<{
@@ -68,7 +69,7 @@ export function CollagePreview({
       e.dataTransfer.effectAllowed = 'move'
 
       // Custom drag ghost: use the photo thumbnail
-      const img = (e.target as HTMLElement).querySelector('img')
+      const img = e.currentTarget.querySelector('img')
       if (img) {
         e.dataTransfer.setDragImage(img, img.width / 2, img.height / 2)
       }
@@ -201,11 +202,8 @@ export function CollagePreview({
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent, area: string) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      handleSlotClick(area)
-    } else if (e.key === 'Escape') {
+  const handleSlotKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
       setSelectedArea(null)
     }
   }
@@ -241,22 +239,13 @@ export function CollagePreview({
           const isDragOver = dragOverArea === area && draggedArea !== area
           const isSelected = selectedArea === area
           const isSwapTarget = selectedArea !== null && selectedArea !== area && !!photo
+          const isFocused = focusedArea === area
 
           return (
             <div
               key={area}
               data-grid-area={area}
               draggable={!!photo}
-              tabIndex={photo ? 0 : -1}
-              role={photo ? 'button' : undefined}
-              aria-label={
-                photo
-                  ? isSelected
-                    ? `Photo slot ${area}, selected — click another slot to swap`
-                    : `Photo slot ${area}, click or drag to reorder`
-                  : `Empty slot ${area}`
-              }
-              aria-pressed={isSelected || undefined}
               onDragStart={(e) => handleDragStart(e, area)}
               onDragOver={(e) => handleDragOver(e, area)}
               onDragLeave={() => setDragOverArea(null)}
@@ -265,8 +254,11 @@ export function CollagePreview({
               onTouchStart={(e) => handleTouchStart(e, area)}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              onClick={() => handleSlotClick(area)}
-              onKeyDown={(e) => handleKeyDown(e, area)}
+              onKeyDown={handleSlotKeyDown}
+              onFocus={() => setFocusedArea(area)}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) setFocusedArea(null)
+              }}
               style={{ 
                 gridArea: area,
                 borderRadius: `${settings.borderRadius}px`,
@@ -293,20 +285,38 @@ export function CollagePreview({
                       transform: buildTransform(positionData),
                     }}
                   />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center pointer-events-none">
-                    <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 flex gap-2">
+                  <button
+                    type="button"
+                    className="absolute inset-0 cursor-move focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
+                    onClick={() => handleSlotClick(area)}
+                    aria-label={
+                      isSelected
+                        ? `Photo slot ${area}, selected — click another slot to swap`
+                        : `Photo slot ${area}, click or drag to reorder`
+                    }
+                    aria-pressed={isSelected}
+                  />
+                  <div className={cn(
+                    "absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center pointer-events-none",
+                    isFocused && "bg-black/20",
+                  )}>
+                    <div className={cn(
+                      "opacity-0 group-hover:opacity-100 transition-all duration-200 flex gap-2",
+                      isFocused && "opacity-100",
+                    )}>
                       <div className="bg-white/90 rounded-full p-3 backdrop-blur-sm">
                         <ArrowsOutSimple className="w-6 h-6 text-primary" weight="bold" />
                       </div>
                       {onEditPhoto && (
                         <button
-                          className="bg-white/90 rounded-full p-3 backdrop-blur-sm pointer-events-auto hover:bg-white transition-colors"
+                          type="button"
+                          className="bg-white/90 rounded-full p-3 backdrop-blur-sm pointer-events-auto hover:bg-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                           onClick={(e) => {
                             e.stopPropagation()
                             onEditPhoto(area)
                           }}
                           aria-label={`Edit photo in slot ${area}`}
-                          tabIndex={-1}
+                          data-edit-photo-area={area}
                         >
                           <PencilSimple className="w-6 h-6 text-primary" weight="bold" />
                         </button>

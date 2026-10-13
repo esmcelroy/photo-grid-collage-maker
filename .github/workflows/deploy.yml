@@ -1,9 +1,7 @@
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
 
 permissions:
   contents: read
@@ -19,9 +17,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
       - uses: actions/cache@v4
         with:
           path: ~/.npm

@@ -36,13 +36,22 @@ export interface PhotoAnalysis {
   colorHistogram?: Float32Array
 }
 
-const analysisCache = new Map<string, PhotoAnalysis>()
+interface CachedAnalysis {
+  analysis: PhotoAnalysis
+  dataUrl: string
+  mode: DetectionMode
+  generation: number
+}
+
+const analysisCache = new Map<string, CachedAnalysis>()
+let cacheGeneration = 0
 
 export function getCachedAnalysis(photoId: string): PhotoAnalysis | undefined {
-  return analysisCache.get(photoId)
+  return analysisCache.get(photoId)?.analysis
 }
 
 export function clearAnalysisCache() {
+  cacheGeneration += 1
   analysisCache.clear()
 }
 
@@ -229,6 +238,7 @@ async function detectFaces(dataUrl: string, mode: DetectionMode, photoId?: strin
 let currentDetectionMode: DetectionMode = 'basic'
 
 export function setAnalysisDetectionMode(mode: DetectionMode): void {
+  if (currentDetectionMode !== mode) clearAnalysisCache()
   currentDetectionMode = mode
 }
 
@@ -332,10 +342,18 @@ export async function analyzePhoto(photoId: string, dataUrl: string): Promise<Ph
 
 export async function analyzePhotoWithCache(photoId: string, dataUrl: string): Promise<PhotoAnalysis> {
   const cached = analysisCache.get(photoId)
-  if (cached) return cached
+  if (cached && cached.dataUrl === dataUrl && cached.mode === currentDetectionMode && cached.generation === cacheGeneration) {
+    return cached.analysis
+  }
 
+  const mode = currentDetectionMode
+  const generation = cacheGeneration
   const analysis = await analyzePhoto(photoId, dataUrl)
-  analysisCache.set(photoId, analysis)
+  // A mode change or explicit cache clear invalidates in-flight work as well.
+  // Do not let an older completion repopulate the cache with stale detections.
+  if (generation === cacheGeneration && mode === currentDetectionMode) {
+    analysisCache.set(photoId, { analysis, dataUrl, mode, generation })
+  }
   return analysis
 }
 

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+required_major="$(tr -d '[:space:]' < .nvmrc)"
+if ! command -v node >/dev/null 2>&1 || [ "$(node -p 'process.versions.node.split(".")[0]')" != "$required_major" ]; then
+  echo "Installing Node.js ${required_major}"
+  if ! command -v curl >/dev/null 2>&1; then
+    sudo apt-get update
+    sudo apt-get install -y curl ca-certificates
+  fi
+  curl -fsSL "https://deb.nodesource.com/setup_${required_major}.x" | sudo -E bash -
+  sudo apt-get install -y nodejs
+fi
+
+echo "Installing locked npm dependencies"
+npm ci
+
+playwright_version="$(node -p "require('./node_modules/@playwright/test/package.json').version")"
+playwright_marker="$HOME/.cache/ms-playwright/.orb-deps-chromium-webkit-$playwright_version"
+if [ ! -f "$playwright_marker" ]; then
+  echo "Installing Chromium, WebKit, and their Debian dependencies"
+  npx playwright install --with-deps chromium webkit
+  mkdir -p "$(dirname "$playwright_marker")"
+  touch "$playwright_marker"
+else
+  echo "Checking Playwright Chromium and WebKit installation"
+  npx playwright install chromium webkit
+fi

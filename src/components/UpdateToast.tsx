@@ -20,7 +20,7 @@ export function UpdateToast({ needRefresh, onRefresh }: UpdateToastProps) {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 50, opacity: 0 }}
           className={cn(
-            'fixed bottom-4 right-4 z-50 rounded-lg border border-border bg-background p-4 shadow-lg',
+            'fixed bottom-24 right-4 z-50 rounded-lg border border-border bg-background p-4 shadow-lg lg:bottom-4',
             'flex flex-col gap-3'
           )}
         >
