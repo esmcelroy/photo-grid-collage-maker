@@ -128,6 +128,22 @@ test.describe('Photo Management', () => {
     await page.locator('#non-editable-child').focus()
     await app.pressCollageUndo()
     await expect(page.getByText('8px', { exact: true })).toBeVisible()
+
+    await page.evaluate(() => {
+      const probe = document.createElement('div')
+      probe.innerHTML = '<input id="undo-radio" type="radio"><input id="undo-color" type="color"><input id="undo-file" type="file"><input id="undo-readonly-input" readonly value="draft"><textarea id="undo-readonly-textarea" readonly>draft</textarea>'
+      document.body.append(probe)
+    })
+
+    for (const id of ['undo-radio', 'undo-color', 'undo-file', 'undo-readonly-input', 'undo-readonly-textarea']) {
+      await spacing.press('ArrowRight')
+      await expect(page.getByText('10px', { exact: true })).toBeVisible()
+      const control = page.locator(`#${id}`)
+      await control.focus()
+      await expect(control).toBeFocused()
+      await app.pressCollageUndo()
+      await expect(page.getByText('8px', { exact: true })).toBeVisible()
+    }
   })
 
   test('never stores more than the 16-photo session limit', async ({ page }) => {

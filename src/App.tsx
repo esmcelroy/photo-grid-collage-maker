@@ -68,7 +68,8 @@ function getLayoutAspectRatio(layout: GridLayout | null): number {
 function isEditableKeyboardTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false
   const element = target instanceof HTMLElement ? target : target.parentElement
-  return element?.matches('input, textarea') || element?.isContentEditable === true
+  if (element?.matches('input, textarea')) return element.matches(':read-write')
+  return element?.isContentEditable === true
 }
 
 function CollapsibleSection({ title, defaultOpen = true, headerAction, children }: {
