@@ -14,7 +14,7 @@
 4. [What NOT to Test](#what-not-to-test)
 5. [Component Test Patterns](#component-test-patterns-react-testing-library)
 6. [Pure Function Test Patterns](#pure-function-test-patterns-jest)
-7. [API Test Patterns (Future)](#api-test-patterns-future--jest--supertest)
+7. [API Test Patterns (Legacy)](#api-test-patterns-legacy--jest--supertest)
 8. [Playwright E2E Patterns](#playwright-e2e-patterns)
 9. [Test File Conventions](#test-file-conventions)
 10. [TDD Cycle Reminder](#tdd-cycle-reminder)
@@ -58,7 +58,7 @@ UploadZone › calls onFilesSelected when valid images are dropped
 |------|------|-------|-------------|
 | **Unit** | Jest + RTL | Single component or pure function | Always — for pure functions and component rendering |
 | **Integration** | Jest + RTL | Component + hooks + state together | Feature-level behavior across multiple connected units |
-| **API** | Jest + Supertest | Backend routes | Backend changes (future phase — not applicable yet) |
+| **API** | Jest + Supertest | Backend routes | Not used in the current client-only architecture |
 | **E2E / UI** | Playwright | Critical full user journeys | Flows that can't be confidently validated at lower levels |
 | **Manual** | Browser | Visual/exploratory | Layout bugs, animations, drag-and-drop feel, edge cases |
 
@@ -68,7 +68,7 @@ The project now includes:
 
 - **Unit/Integration:** Jest + React Testing Library (`jest.config.ts`, `src/__tests__/setup.ts`)
 - **Accessibility:** jest-axe for automated WCAG compliance checks
-- **API (future):** Jest + Supertest
+- **Persistence:** real IndexedDB browser tests; there is no application REST API
 - **E2E:** Playwright (`playwright.config.ts`, `e2e/journeys/`, `e2e/pages/`, `e2e/fixtures/`)
 
 ---
@@ -216,9 +216,9 @@ describe('getLayoutsForPhotoCount', () => {
 
 ---
 
-## API Test Patterns (Future — Jest + Supertest)
+## API Test Patterns (Legacy — Jest + Supertest)
 
-> **Note:** The backend does not exist yet. These patterns apply when REST API routes are added in a future phase.
+> **Note:** The app intentionally has no backend. The examples below are historical reference, not instructions to add a server or network photo storage. Test current persistence through `useCollageApi` and real IndexedDB browser journeys.
 
 ### Setup
 
@@ -306,8 +306,8 @@ Only automate journeys where a regression would be high-impact and not caught by
 1. **Upload → Layout → Download**
    - Upload a photo → a layout appears in the preview → click Download → file is saved.
 
-2. **9-photo limit enforcement**
-   - Upload 9 photos → attempt to upload a 10th → verify the UI enforces the limit.
+2. **16-photo limit enforcement**
+   - Upload 16 photos → attempt to upload a 17th → verify the UI and atomic IndexedDB limit.
 
 3. **Layout switching**
    - Upload multiple photos → select different layout options → verify the preview updates for each.
@@ -380,6 +380,47 @@ src/
 | Unit / integration (React) | `.test.tsx` |
 | Unit / integration (TS only) | `.test.ts` |
 | Playwright E2E | `.spec.ts` |
+
+---
+
+## Production PWA and release gates
+
+Use the pinned Node version (`nvm use`), `npm ci`, then install browser binaries:
+
+```bash
+npx playwright install chromium webkit
+npm run test:ui
+npm run test:production
+```
+
+On Debian/Linux, add `--with-deps` to the install command. Do not run the
+Debian orb setup installer on macOS.
+
+The regular UI suite uses Vite dev. The production suite builds the app, runs
+Vite preview on port 4173, and tests actual service-worker caching in desktop
+Chromium, mobile Chromium emulation, and desktop WebKit. It covers a cold-offline
+negative control, warm-offline editing and 640×480 PNG downloads, uncached model
+fallback, a mixed HEIC/JPEG upload with unavailable decoder code, and update
+activation serving changed precached HTML while preserving the session and edits.
+The HEIC case does not prove actual HEIC decoding. Emulation does not prove
+physical-device behavior or iOS home-screen installation.
+
+Each test starts in a fresh browser context. Wait for service-worker readiness
+and a controlled page before going offline; test the online-to-offline transition
+before reloading so paused local mutations cannot hide behind a fresh page.
+Update tests change generated HTML and its worker precache revision and restore
+both in `finally`; keep the production suite serial and do not share its preview
+server with other runs. These tests intentionally use no mocked service workers.
+
+Reports, screenshots, and failure traces are under `test-results/production/`.
+Open the report with `npx playwright show-report test-results/production/report`.
+CI uploads this directory even after a test failure; never commit generated
+evidence or `dist/`.
+
+CI's lint, explicit TypeScript, unit/coverage, UI, and production-browser jobs are
+mandatory. Only a successful main-push run calls the reusable Pages workflow,
+which checks out that same revision. PRs do not deploy. A local workflow syntax
+check alone is not evidence that a failed GitHub run actually blocked deployment.
 
 ---
 

@@ -2,6 +2,7 @@ import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals
 import { render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 import { OfflineBanner } from '@/components/OfflineBanner'
+import { axe } from 'jest-axe'
 
 // Mock framer-motion to avoid animation timing issues in tests
 jest.unstable_mockModule('framer-motion', () => ({
@@ -21,14 +22,19 @@ describe('OfflineBanner', () => {
     localStorage.clear()
   })
 
+  it('has no accessibility violations when offline', async () => {
+    const { container } = render(React.createElement(OfflineBannerMocked, { isOnline: false, offlineReady: false }))
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
   it('renders offline message when isOnline is false', () => {
     render(React.createElement(OfflineBannerMocked, { isOnline: false, offlineReady: false }))
-    expect(screen.getByText("You're offline — everything still works")).toBeInTheDocument()
+    expect(screen.getByText("You're offline — some tools need previously cached downloads.")).toBeInTheDocument()
   })
 
   it('does not render offline message when isOnline is true', () => {
     render(React.createElement(OfflineBannerMocked, { isOnline: true, offlineReady: false }))
-    expect(screen.queryByText("You're offline — everything still works")).not.toBeInTheDocument()
+    expect(screen.queryByText("You're offline — some tools need previously cached downloads.")).not.toBeInTheDocument()
   })
 
   it('shows "Ready for offline use ✓" when offlineReady is true and not previously shown', () => {
@@ -63,7 +69,7 @@ describe('OfflineBanner', () => {
 
   it('prioritizes offline banner over offline-ready message', () => {
     render(React.createElement(OfflineBannerMocked, { isOnline: false, offlineReady: true }))
-    expect(screen.getByText("You're offline — everything still works")).toBeInTheDocument()
+    expect(screen.getByText("You're offline — some tools need previously cached downloads.")).toBeInTheDocument()
     expect(screen.queryByText('Ready for offline use ✓')).not.toBeInTheDocument()
   })
 })

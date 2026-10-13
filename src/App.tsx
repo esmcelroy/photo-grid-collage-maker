@@ -18,10 +18,21 @@ import { AppFooter } from '@/components/AppFooter'
 import { InstallButton } from '@/components/InstallButton'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { UpdateToast } from '@/components/UpdateToast'
+import { ProjectLibrary } from '@/components/ProjectLibrary'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Toaster } from '@/components/ui/sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Trash, Sparkle, ArrowCounterClockwise, ArrowClockwise, UploadSimple, Sliders, GridFour, DownloadSimple, Sun, Moon, Monitor, MagicWand } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useCollageHistory, CollageSnapshot } from '@/hooks/use-collage-history'
@@ -36,6 +47,7 @@ import type { DominantColor } from '@/lib/color-intelligence'
 import { initMLWorker, disposeMLWorker, getWorkerStatus, onWorkerStatusChange, hasNativeFaceDetector } from '@/lib/ml-worker-client'
 import type { WorkerStatus } from '@/lib/ml-worker-client'
 import { cn } from '@/lib/utils'
+import { getStorageEstimate, isQuotaExceededError, requestPersistentStorage, type PersistentStorageStatus, type StorageEstimate } from '@/lib/storage'
 import { motion, AnimatePresence } from 'framer-motion'
 
 function initializePositions(layout: GridLayout, photosArray: UploadedPhoto[]): PhotoPosition[] {
@@ -43,6 +55,21 @@ function initializePositions(layout: GridLayout, photosArray: UploadedPhoto[]): 
     photoId: photosArray[index]?.id || '',
     gridArea: area,
   }))
+}
+
+function getLayoutAspectRatio(layout: GridLayout | null): number {
+  if (!layout) return 1
+  const value = layout.aspectRatio ?? 1
+  if (typeof value === 'number') return value
+  const [width, height] = value.split('/').map(Number)
+  return Number.isFinite(width) && Number.isFinite(height) && height > 0 ? width / height : 1
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false
+  const element = target instanceof HTMLElement ? target : target.parentElement
+  if (element?.matches('input, textarea')) return element.matches(':read-write')
+  return element?.isContentEditable === true
 }
 
 function CollapsibleSection({ title, defaultOpen = true, headerAction, children }: {
@@ -77,13 +104,21 @@ function App() {
     photoPositions,
     settings,
     isLoading,
+    isInitializing,
+    initError,
+    sessionError,
     initCollage,
+    recoverSession,
+    retryInitialization,
+    retry,
     addPhoto,
     removePhoto,
     updateLayout,
     updatePositions,
     updateSettings,
     clearAll,
+    projectName, projects, projectsLoading, projectsError, retryProjects,
+    createProject, openProject, renameProject, duplicateProject, deleteProject, exportProject, importProject,
   } = useCollageApi()
 
   const { canUndo, canRedo, pushSnapshot, undo, redo, setRestoring, clear: clearHistory } = useCollageHistory()
@@ -109,18 +144,71 @@ function App() {
   const previewRef = useRef<HTMLDivElement>(null)
   const [editingArea, setEditingArea] = useState<string | null>(null)
   const settingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const uploadInProgressRef = useRef(false)
+  const collageIdRef = useRef(collageId)
+  collageIdRef.current = collageId
   const [availableLayouts, setAvailableLayouts] = useState<GridLayout[]>([])
   const [selectedLayout, setSelectedLayout] = useState<GridLayout | null>(null)
   const [showCarousel, setShowCarousel] = useState(false)
   const [compareIds, setCompareIds] = useState<string[]>([])
-  const [analysisVersion, setAnalysisVersion] = useState(0)
+  const [analysisResultsVersion, setAnalysisResultsVersion] = useState(0)
   const [workerStatus, setWorkerStatus] = useState<WorkerStatus>(getWorkerStatus)
+  const [autoPositionRequest, setAutoPositionRequest] = useState(0)
+  const positionRevisionRef = useRef(0)
+  const completedAutoPositionRequestRef = useRef(0)
+  const [storageStatus, setStorageStatus] = useState<PersistentStorageStatus | null>(null)
+  const [storageEstimate, setStorageEstimate] = useState<StorageEstimate | null>(null)
+  const [clearDialogOpen, setClearDialogOpen] = useState(false)
   const isComparing = compareIds.length > 0
+
+  // A completed analysis must never apply to positions that the user changed
+  // while the asynchronous work was in flight.
+  useEffect(() => {
+    positionRevisionRef.current += 1
+  }, [photoPositions])
+
+  const cancelPendingAutoPosition = useCallback(() => {
+    positionRevisionRef.current += 1
+    completedAutoPositionRequestRef.current = autoPositionRequest
+  }, [autoPositionRequest])
+
+  const previousProject = useRef(collageId)
+  useEffect(() => {
+    if (previousProject.current === collageId) return
+    previousProject.current = collageId
+    clearHistory()
+    setEditingArea(null)
+    setShowCarousel(false)
+    setCompareIds([])
+    setClearDialogOpen(false)
+    setRestoring(false)
+    cancelPendingAutoPosition()
+  }, [collageId, clearHistory, setRestoring, cancelPendingAutoPosition])
+
+  const handleSmartPositionToggle = useCallback(() => {
+    const nextEnabled = !smartPositionEnabled
+    setSmartPositionEnabled(nextEnabled)
+    if (nextEnabled) setAutoPositionRequest(request => request + 1)
+  }, [setSmartPositionEnabled, smartPositionEnabled])
 
   // Track ML worker status changes
   useEffect(() => {
     return onWorkerStatusChange(setWorkerStatus)
   }, [])
+
+  useEffect(() => {
+    void requestPersistentStorage().then(setStorageStatus)
+    void getStorageEstimate().then(setStorageEstimate)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (settingsTimerRef.current) {
+        clearTimeout(settingsTimerRef.current)
+        settingsTimerRef.current = null
+      }
+    }
+  }, [collageId])
 
   // Initialize or dispose ML worker based on detection mode
   useEffect(() => {
@@ -153,7 +241,7 @@ function App() {
     if (prevDetectionMode.current !== detectionMode) {
       prevDetectionMode.current = detectionMode
       clearAnalysisCache()
-      setAnalysisVersion(v => v + 1)
+      setAnalysisResultsVersion(v => v + 1)
     }
   }, [detectionMode])
 
@@ -186,7 +274,7 @@ function App() {
     const ranked = rankLayouts(availableLayouts, characteristics)
     return ranked.map(r => availableLayouts.find(l => l.id === r.layoutId)!).filter(Boolean)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableLayouts, photos, analysisVersion])
+  }, [availableLayouts, photos, analysisResultsVersion])
 
   // The top-ranked layout gets a "Recommended" badge (only when analysis data exists)
   const recommendedLayoutId = useMemo(() => {
@@ -197,7 +285,7 @@ function App() {
     })
     return hasAnalysis ? rankedLayouts[0]?.id ?? null : null
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rankedLayouts, photos, analysisVersion])
+  }, [rankedLayouts, photos, analysisResultsVersion])
 
   // Aggregate dominant colors from all analyzed photos for background suggestions
   const allPhotoColors: DominantColor[] = useMemo(() => {
@@ -211,7 +299,7 @@ function App() {
     }
     return colors
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photos, analysisVersion])
+  }, [photos, analysisResultsVersion])
 
   const handleToggleCarousel = useCallback(() => {
     setShowCarousel(prev => {
@@ -244,12 +332,12 @@ function App() {
 
   // Initialize session if none exists
   useEffect(() => {
-    if (!collageId) {
-      initCollage()
+    if (!collageId && !isInitializing && !initError) {
+      void initCollage().catch(() => {})
     }
     // initCollage is a stable ref — safe to omit from deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collageId])
+  }, [collageId, isInitializing, initError])
 
   useEffect(() => {
     const layouts = getLayoutsForPhotoCount(photos.length)
@@ -280,6 +368,16 @@ function App() {
   }, [selectedLayoutId, availableLayouts])
 
   const handleFilesSelected = useCallback(async (files: File[]) => {
+    if (uploadInProgressRef.current) {
+      toast.info('An upload is already in progress.')
+      return
+    }
+    const uploadSessionId = collageId
+    if (!uploadSessionId) {
+      toast.error('Your collage is not ready yet. Please try again.')
+      return
+    }
+    uploadInProgressRef.current = true
     try {
       const remaining = MAX_PHOTOS - photos.length
       const toAdd = files.slice(0, remaining)
@@ -297,21 +395,43 @@ function App() {
         )
       }
 
-      await Promise.all(
+      if (collageIdRef.current !== uploadSessionId) {
+        toast.error('The active collage changed before the upload finished. No new photos were stored.')
+        return
+      }
+
+      const results = await Promise.allSettled(
         converted.map(async (file) => {
           const { dataUrl } = await correctExifOrientation(file)
+          if (collageIdRef.current !== uploadSessionId) {
+            throw new Error('The active collage changed during upload')
+          }
           const id = generateUniqueId()
           await addPhoto({ id, dataUrl, fileName: file.name })
         })
       )
-      toast.success(`Added ${converted.length} ${converted.length === 1 ? 'photo' : 'photos'}`)
+      const addedCount = results.filter((result) => result.status === 'fulfilled').length
+      const failedResults = results.filter((result) => result.status === 'rejected')
+      const failedCount = errors.length + failedResults.length
+
+      if (addedCount > 0) {
+        toast.success(`Added ${addedCount} ${addedCount === 1 ? 'photo' : 'photos'}`)
+      }
+      if (failedResults.some((result) => isQuotaExceededError(result.reason))) {
+        toast.error('Storage is full. Remove photos or clear this collage, then try again. Existing photos were not changed.')
+      } else if (failedCount > 0) {
+        toast.error(`${failedCount} ${failedCount === 1 ? 'photo could' : 'photos could'} not be added.`)
+      }
     } catch (error) {
       toast.error('Failed to upload photos')
       console.error(error)
+    } finally {
+      uploadInProgressRef.current = false
     }
-  }, [photos.length, addPhoto])
+  }, [photos.length, collageId, addPhoto])
 
   const handleRemovePhoto = useCallback(async (photoId: string) => {
+    cancelPendingAutoPosition()
     try {
       await removePhoto(photoId)
       toast.success('Photo removed')
@@ -319,7 +439,7 @@ function App() {
       toast.error('Failed to remove photo')
       console.error(error)
     }
-  }, [removePhoto])
+  }, [removePhoto, cancelPendingAutoPosition])
 
   const handleSettingsChange = useCallback((newSettings: CollageSettings) => {
     pushSnapshot(getCurrentSnapshot())
@@ -334,23 +454,26 @@ function App() {
   const handleLayoutSelect = useCallback(async (layoutId: string) => {
     const layout = availableLayouts.find(l => l.id === layoutId)
     if (!layout) return
+    cancelPendingAutoPosition()
     pushSnapshot(getCurrentSnapshot())
     const newPositions = initializePositions(layout, photos)
     await updateLayout(layoutId, newPositions)
     toast.success(`Layout changed to ${layout.name}`)
-  }, [availableLayouts, photos, updateLayout, pushSnapshot, getCurrentSnapshot])
+  }, [availableLayouts, photos, updateLayout, pushSnapshot, getCurrentSnapshot, cancelPendingAutoPosition])
 
   const handleArrangementApply = useCallback(async (layoutId: string, positions: PhotoPosition[]) => {
     const layout = availableLayouts.find(l => l.id === layoutId)
     if (!layout) return
+    cancelPendingAutoPosition()
     pushSnapshot(getCurrentSnapshot())
     await updateLayout(layoutId, positions)
     setShowCarousel(false)
     toast.success(`Applied ${layout.name} arrangement`)
-  }, [availableLayouts, updateLayout, pushSnapshot, getCurrentSnapshot])
+  }, [availableLayouts, updateLayout, pushSnapshot, getCurrentSnapshot, cancelPendingAutoPosition])
 
   const handleAutoLayout = useCallback(async () => {
     if (rankedLayouts.length === 0 || photos.length === 0) return
+    cancelPendingAutoPosition()
     const bestLayout = rankedLayouts[0]
     pushSnapshot(getCurrentSnapshot())
 
@@ -378,12 +501,12 @@ function App() {
 
     await updateLayout(bestLayout.id, positions)
     toast.success(`Auto-applied ${bestLayout.name} with optimized arrangement`)
-  }, [rankedLayouts, photos, updateLayout, pushSnapshot, getCurrentSnapshot])
+  }, [rankedLayouts, photos, updateLayout, pushSnapshot, getCurrentSnapshot, cancelPendingAutoPosition])
 
   const handleDownload = async (options: ExportOptions) => {
     if (!previewRef.current || !selectedLayout) {
       toast.error('No collage to download')
-      return
+      throw new Error('No collage is available to download.')
     }
 
     try {
@@ -392,26 +515,53 @@ function App() {
         previewRef.current,
         options.filename,
         options.format,
-        options.quality
+        options.quality,
+        options.width,
+        options.height
       )
       toast.success('Collage downloaded successfully!')
     } catch (error) {
       toast.error('Failed to download collage')
       console.error(error)
+      throw error
     }
   }
 
   const handleClearAll = async () => {
-    await clearAll()
-    clearHistory()
-    toast.success('All photos cleared')
+    cancelPendingAutoPosition()
+    const originalProject = collageId
+    try {
+      if (settingsTimerRef.current) {
+        clearTimeout(settingsTimerRef.current)
+        settingsTimerRef.current = null
+      }
+      await clearAll()
+      if (collageIdRef.current === originalProject) clearHistory()
+      toast.success('All photos cleared')
+    } catch (error) {
+      toast.error(isQuotaExceededError(error) ? 'Storage is full. Your existing photos were kept.' : 'Could not clear this collage. Your photos were kept.')
+      console.error(error)
+    }
   }
 
   const handleEditPhoto = (area: string) => {
     setEditingArea(area)
   }
 
+  const handleEditDialogOpenChange = (open: boolean) => {
+    if (open || !editingArea) return
+
+    const area = editingArea
+    const originalProject = collageId
+    setEditingArea(null)
+    requestAnimationFrame(() => {
+      if (collageIdRef.current !== originalProject) return
+      document.querySelector<HTMLButtonElement>(`[data-edit-photo-area="${area}"]`)?.focus()
+    })
+  }
+
   const handleApplyEdit = async (updatedPosition: PhotoPosition) => {
+    cancelPendingAutoPosition()
     pushSnapshot(getCurrentSnapshot())
     const newPositions = photoPositions.map(p =>
       p.gridArea === updatedPosition.gridArea ? updatedPosition : p
@@ -426,6 +576,8 @@ function App() {
   const handleUndo = useCallback(async () => {
     const snapshot = undo(getCurrentSnapshot())
     if (!snapshot) return
+    const originalProject = collageId
+    cancelPendingAutoPosition()
     setRestoring(true)
     try {
       if (snapshot.selectedLayoutId) {
@@ -433,13 +585,15 @@ function App() {
       }
       await updateSettings(snapshot.settings)
     } finally {
-      setRestoring(false)
+      if (collageIdRef.current === originalProject) setRestoring(false)
     }
-  }, [undo, getCurrentSnapshot, setRestoring, updateLayout, updateSettings])
+  }, [collageId, undo, getCurrentSnapshot, setRestoring, updateLayout, updateSettings, cancelPendingAutoPosition])
 
   const handleRedo = useCallback(async () => {
     const snapshot = redo(getCurrentSnapshot())
     if (!snapshot) return
+    const originalProject = collageId
+    cancelPendingAutoPosition()
     setRestoring(true)
     try {
       if (snapshot.selectedLayoutId) {
@@ -447,12 +601,13 @@ function App() {
       }
       await updateSettings(snapshot.settings)
     } finally {
-      setRestoring(false)
+      if (collageIdRef.current === originalProject) setRestoring(false)
     }
-  }, [redo, getCurrentSnapshot, setRestoring, updateLayout, updateSettings])
+  }, [collageId, redo, getCurrentSnapshot, setRestoring, updateLayout, updateSettings, cancelPendingAutoPosition])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (isEditableKeyboardTarget(e.target)) return
       const isMod = e.metaKey || e.ctrlKey
       if (!isMod) return
       if (e.key === 'z' && !e.shiftKey) {
@@ -467,14 +622,25 @@ function App() {
     return () => window.removeEventListener('keydown', handler)
   }, [handleUndo, handleRedo])
 
-  // Auto-apply smart positions when enabled and layout changes
+  const photoInputKey = useMemo(
+    () => photos.map(photo => `${photo.id}:${photo.dataUrl}`).join('|'),
+    [photos]
+  )
+
+  // Auto-apply only for explicit smart-position triggers. Completion updates
+  // ranking/color suggestions, but is deliberately not an analysis trigger.
   useEffect(() => {
     if (!smartPositionEnabled || !selectedLayout || photos.length === 0) return
+
+    const needsWorker = detectionMode === 'advanced' || (detectionMode === 'standard' && !hasNativeFaceDetector())
+    if (needsWorker && workerStatus !== 'ready') return
 
     // Sync detection mode to analysis pipeline before running
     setAnalysisDetectionMode(detectionMode)
 
     let cancelled = false
+    const positionRevision = positionRevisionRef.current
+    const shouldApplyPositions = autoPositionRequest > completedAutoPositionRequestRef.current
     async function applySmartPositions() {
       const results = await Promise.allSettled(
         photos.map(p => analyzePhotoWithCache(p.id, p.dataUrl))
@@ -496,17 +662,30 @@ function App() {
       })
 
       const changed = updatedPositions.some((p, i) => p.objectPosition !== photoPositions[i].objectPosition)
-      if (changed && !cancelled) {
-        void updatePositions(updatedPositions).catch(() => {})
+      if (shouldApplyPositions && changed && positionRevisionRef.current === positionRevision) {
+        try {
+          await updatePositions(updatedPositions)
+        } catch {
+          if (!cancelled && positionRevisionRef.current === positionRevision) {
+            toast.error('Failed to apply smart photo positions')
+          }
+        }
       }
-      // Bump analysis version so ranking/color memos re-evaluate
-      if (!cancelled) setAnalysisVersion(v => v + 1)
+      if (shouldApplyPositions && !cancelled && positionRevisionRef.current === positionRevision) {
+        completedAutoPositionRequestRef.current = autoPositionRequest
+      }
+      // Completion notifies ranking and color suggestions without restarting analysis.
+      if (!cancelled) {
+        setAnalysisResultsVersion(v => v + 1)
+      }
     }
 
     applySmartPositions()
     return () => { cancelled = true }
+    // photoPositions is intentionally excluded: changes invalidate the request
+    // through positionRevisionRef but must not reapply smart positioning.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [smartPositionEnabled, selectedLayoutId, photos.length, detectionMode, analysisVersion])
+  }, [autoPositionRequest, collageId, detectionMode, photoInputKey, selectedLayout, smartPositionEnabled, workerStatus])
 
   // Derived state for edit dialog
   const editingPosition = editingArea
@@ -517,8 +696,30 @@ function App() {
     ? photos.find(p => p.id === editingPhotoId)
     : undefined
 
-  if (isLoading && !collageId) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  if (isLoading || isInitializing) {
+    return <div className="min-h-screen flex items-center justify-center">Opening your collage…</div>
+  }
+
+  if (sessionError || initError) {
+    const isMissing = sessionError?.kind === 'missing'
+    return (
+      <main className="min-h-screen flex items-center justify-center p-4">
+        <Card className="max-w-lg p-6 space-y-4">
+          <h1 className="text-xl font-semibold">{isMissing ? 'Your saved collage is unavailable' : 'We could not open your collage'}</h1>
+          <p className="text-muted-foreground">
+            {isMissing
+              ? 'The browser remembers a collage that is no longer in its local storage. Create a new empty collage to keep editing; this does not remove any other browser data.'
+              : 'Your local collage could not be read. Try again before creating a new collage so existing work is not replaced.'}
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {initError
+              ? <Button variant="outline" onClick={() => void retryInitialization().catch(() => {})}>Try again</Button>
+              : <Button variant="outline" onClick={() => void retry()}>Try again</Button>}
+            <Button onClick={() => void recoverSession().catch(() => {})}>{isMissing ? 'Create new collage' : 'Create a new collage'}</Button>
+          </div>
+        </Card>
+      </main>
+    )
   }
 
   return (
@@ -527,6 +728,14 @@ function App() {
       <UpdateToast needRefresh={needRefresh} onRefresh={updateSw} />
       <Toaster position="top-right" />
       <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-8 max-w-7xl">
+        {storageStatus && storageStatus !== 'granted' && (
+          <Card className="mb-4 p-4 text-sm text-muted-foreground" role="status">
+            {storageStatus === 'unavailable'
+              ? 'Your browser does not offer persistent-storage controls. You can keep editing, but browser storage may be cleared by the device or browser.'
+              : 'Your browser did not grant persistent storage. You can keep editing, but avoid clearing browser data to protect this collage.'}
+            {storageEstimate && ` Currently using ${Math.round(storageEstimate.usage / 1024 / 1024)} MB of ${Math.round(storageEstimate.quota / 1024 / 1024)} MB available.`}
+          </Card>
+        )}
         <header className="mb-4 sm:mb-8">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 sm:gap-3">
@@ -585,6 +794,10 @@ function App() {
             </div>
           </div>
         </header>
+        <ProjectLibrary projects={projects} activeId={collageId} activeName={projectName}
+          loading={projectsLoading} loadError={projectsError} onRetry={() => { void retryProjects() }}
+          onOpen={openProject} onCreate={createProject} onRename={renameProject} onDuplicate={duplicateProject}
+          onDelete={deleteProject} onExport={exportProject} onImport={importProject} />
 
         <main className="grid lg:grid-cols-3 gap-6 mb-6">
           <div className="lg:col-span-2 space-y-6 min-w-0">
@@ -605,7 +818,7 @@ function App() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={handleClearAll}
+                    onClick={() => setClearDialogOpen(true)}
                     className="min-h-[44px]"
                   >
                     <Trash className="w-4 h-4 mr-2" weight="duotone" />
@@ -641,8 +854,10 @@ function App() {
                   <h2 className="text-lg font-semibold">Preview</h2>
                   <div className="hidden lg:block">
                     <ExportDialog
+                      key={collageId}
                       onExport={handleDownload}
                       disabled={!selectedLayout}
+                      aspectRatio={getLayoutAspectRatio(selectedLayout)}
                     />
                   </div>
                 </div>
@@ -684,6 +899,7 @@ function App() {
                   photoPositions={photoPositions}
                   settings={settings}
                   onPositionsChange={(nextPositions) => {
+                    cancelPendingAutoPosition()
                     pushSnapshot(getCurrentSnapshot())
                     void updatePositions(nextPositions).catch(() => {
                       toast.error('Failed to update photo positions')
@@ -733,8 +949,9 @@ function App() {
                     </div>
                     <button
                       role="switch"
+                      aria-label="Smart positioning"
                       aria-checked={smartPositionEnabled}
-                      onClick={() => setSmartPositionEnabled(!smartPositionEnabled)}
+                      onClick={handleSmartPositionToggle}
                       className={cn(
                         "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
                         smartPositionEnabled ? "bg-primary" : "bg-muted-foreground/30"
@@ -748,6 +965,9 @@ function App() {
                       />
                     </button>
                   </div>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Turning this on applies automatic positioning to the current layout. Manual edits remain unchanged until you turn Smart Position off and on again.
+                  </p>
                   <CustomizationControls
                     settings={settings}
                     onSettingsChange={handleSettingsChange}
@@ -811,8 +1031,9 @@ function App() {
 
       {editingPhoto && editingPosition && (
         <PhotoEditDialog
+          key={collageId}
           open={!!editingArea}
-          onOpenChange={(open) => { if (!open) setEditingArea(null) }}
+          onOpenChange={handleEditDialogOpenChange}
           photo={editingPhoto}
           position={editingPosition}
           onApply={handleApplyEdit}
@@ -822,8 +1043,10 @@ function App() {
       {photos.length > 0 && selectedLayout && (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border p-3 lg:hidden">
           <ExportDialog
+            key={collageId}
             onExport={handleDownload}
             disabled={!selectedLayout}
+            aspectRatio={getLayoutAspectRatio(selectedLayout)}
             trigger={
               <Button className="w-full min-h-[44px]" size="lg">
                 <DownloadSimple className="w-5 h-5 mr-2" weight="bold" />
@@ -835,6 +1058,23 @@ function App() {
       )}
 
       <AppFooter />
+      <AlertDialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear this collage?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes all photos and layout data in this collage from this browser. A new empty collage will be created.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setClearDialogOpen(false)
+              void handleClearAll()
+            }}>Clear all photos</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

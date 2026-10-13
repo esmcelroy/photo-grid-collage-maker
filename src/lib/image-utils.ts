@@ -1,3 +1,5 @@
+import { validateExportDimensions } from '@/lib/export-dimensions'
+
 export async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -223,10 +225,15 @@ export function replaceOklchInSubtree(root: HTMLElement): () => void {
 /* istanbul ignore next -- html2canvas requires a real browser; covered by Playwright e2e */
 export async function downloadCollage(
   canvasElement: HTMLElement,
-  filename: string = 'collage.png',
-  format: 'png' | 'jpeg' = 'png',
-  quality: number = 1.0
+  filename: string,
+  format: 'png' | 'jpeg',
+  quality: number,
+  width: number,
+  height: number
 ): Promise<void> {
+  const dimensionError = validateExportDimensions(width, height)
+  if (dimensionError) throw new Error(dimensionError)
+
   const html2canvas = (await import('html2canvas')).default
 
   // Convert oklch/oklab colors before html2canvas processes the DOM
@@ -235,13 +242,46 @@ export async function downloadCollage(
   const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png'
 
   try {
-    const canvas = await html2canvas(canvasElement, {
-      scale: 3,
+    const bounds = canvasElement.getBoundingClientRect()
+    if (bounds.width <= 0 || bounds.height <= 0) {
+      throw new Error('The collage preview is not ready. Please try again.')
+    }
+    // Render at the requested resolution, never allocating an intermediate
+    // raster larger than the validated output even for a custom aspect ratio.
+    const scale = Math.min(width / bounds.width, height / bounds.height)
+    const sourceCanvas = await html2canvas(canvasElement, {
+      scale,
       useCORS: true,
       allowTaint: true,
       backgroundColor: format === 'jpeg' ? '#ffffff' : null,
       logging: false,
       onclone: (clonedDoc: Document, clonedEl: HTMLElement) => {
+        // html2canvas does not implement object-fit/object-position. Bake each
+        // photo's cover crop into its cloned image; CSS still applies the
+        // original rotation, zoom, clipping and rounded corners afterward.
+        const photos = canvasElement.querySelectorAll('img')
+        clonedEl.querySelectorAll('img').forEach((clonedPhoto, index) => {
+          const photo = photos[index]
+          const style = getComputedStyle(photo)
+          const photoWidth = parseFloat(style.width)
+          const photoHeight = parseFloat(style.height)
+          if (!photo.naturalWidth || !photo.naturalHeight) {
+            throw new Error('A photo is not ready to export. Please try again.')
+          }
+          const coverScale = Math.max(photoWidth / photo.naturalWidth, photoHeight / photo.naturalHeight)
+          const drawWidth = photo.naturalWidth * coverScale
+          const drawHeight = photo.naturalHeight * coverScale
+          const [x, y] = style.objectPosition.split(' ').map(parseFloat)
+          const crop = document.createElement('canvas')
+          crop.width = Math.max(1, Math.ceil(photoWidth * scale))
+          crop.height = Math.max(1, Math.ceil(photoHeight * scale))
+          const cropContext = crop.getContext('2d')
+          if (!cropContext) throw new Error('Could not prepare a photo for export.')
+          cropContext.scale(crop.width / photoWidth, crop.height / photoHeight)
+          cropContext.drawImage(photo, (photoWidth - drawWidth) * x / 100, (photoHeight - drawHeight) * y / 100, drawWidth, drawHeight)
+          clonedPhoto.src = crop.toDataURL('image/png')
+          clonedPhoto.style.objectFit = 'fill'
+        })
         // html2canvas clones the entire document — convert CSS custom
         // properties on the cloned :root AND element styles in the clone
         const clonedRoot = clonedDoc.documentElement
@@ -266,17 +306,30 @@ export async function downloadCollage(
       },
     })
 
-    canvas.toBlob((blob) => {
-      if (!blob) return
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Could not create an export canvas.')
+    context.drawImage(sourceCanvas, 0, 0, width, height)
 
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = filename
-      link.click()
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((result) => {
+        if (result) {
+          resolve(result)
+        } else {
+          reject(new Error('Browser could not encode the collage image. Try a smaller size and export again.'))
+        }
+      }, mimeType, quality)
+    })
 
-      URL.revokeObjectURL(url)
-    }, mimeType, quality)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
   } finally {
     restore()
   }

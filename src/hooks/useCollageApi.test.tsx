@@ -18,6 +18,8 @@ jest.unstable_mockModule('@/lib/db', () => ({
   addPhoto: jest.fn(),
   removePhoto: jest.fn(),
   deleteCollage: jest.fn(),
+  replaceCollage: jest.fn(),
+  listProjects: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
   db: {},
 }))
 
@@ -69,6 +71,44 @@ describe('useCollageApi', () => {
 
   afterEach(() => {
     localStorage.clear()
+  })
+
+  it('keeps an old multi-step operation bound to its project after switching', async () => {
+    const states = new Map<string, import('@/lib/db').CollageState>(['a', 'b'].map(id => [id, { ...mockCollageState, id }]))
+    localStorage.setItem(SESSION_KEY, 'a')
+    jest.mocked(collageDb.getCollageState).mockImplementation(async id => states.get(id)!)
+    jest.mocked(collageDb.updateCollage).mockImplementation(async (id, patch) => {
+      const state = { ...states.get(id)!, ...patch }
+      states.set(id, state)
+      return state
+    })
+    const { wrapper } = createWrapper()
+    const { result } = renderHook(() => useCollageApi(), { wrapper })
+    await waitFor(() => expect(result.current.photos).toHaveLength(1))
+    const originalOperation = result.current.updateSettings
+    await act(async () => { await result.current.openProject('b') })
+    await waitFor(() => expect(result.current.collageId).toBe('b'))
+    await act(async () => { await originalOperation({ gap: 24, borderRadius: 12, backgroundColor: '#abcdef' }) })
+    expect(states.get('a')!.settings.gap).toBe(24)
+    expect(states.get('b')!.settings.gap).toBe(8)
+    expect(result.current.settings.gap).toBe(8)
+  })
+
+  it('does not reactivate a late-created project after an explicit switch', async () => {
+    localStorage.setItem(SESSION_KEY, 'a')
+    jest.mocked(collageDb.getCollageState).mockImplementation(async id => ({ ...mockCollageState, id }))
+    let finish!: (value: { id: string }) => void
+    jest.mocked(collageDb.createCollage).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const { wrapper } = createWrapper()
+    const { result } = renderHook(() => useCollageApi(), { wrapper })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    let creation!: Promise<void>
+    act(() => { creation = result.current.createProject('Slow creation') })
+    await act(async () => { await result.current.openProject('b') })
+    await act(async () => { finish({ id: 'late' }); await creation })
+    expect(result.current.collageId).toBe('b')
+    expect(localStorage.getItem(SESSION_KEY)).toBe('b')
+    expect(result.current.settings.gap).toBe(8)
   })
 
   describe('when no session exists', () => {
@@ -249,12 +289,12 @@ describe('useCollageApi', () => {
   })
 
   describe('clearAll', () => {
-    it('creates a new collage and updates the session id', async () => {
+    it('replaces the previous collage and updates the session id', async () => {
       localStorage.setItem(SESSION_KEY, 'test-session-id')
 
       ;(collageDb.getCollageState as jest.MockedFunction<typeof collageDb.getCollageState>)
         .mockResolvedValue(mockCollageState)
-      ;(collageDb.createCollage as jest.MockedFunction<typeof collageDb.createCollage>)
+      ;(collageDb.replaceCollage as jest.MockedFunction<typeof collageDb.replaceCollage>)
         .mockResolvedValueOnce({ id: 'new-cleared-id' })
 
       const { wrapper } = createWrapper()
@@ -266,7 +306,7 @@ describe('useCollageApi', () => {
         await result.current.clearAll()
       })
 
-      expect(collageDb.createCollage).toHaveBeenCalled()
+      expect(collageDb.replaceCollage).toHaveBeenCalledWith('test-session-id')
       expect(localStorage.getItem(SESSION_KEY)).toBe('new-cleared-id')
     })
   })
@@ -303,6 +343,29 @@ describe('useCollageApi', () => {
       expect(result.current.photos).toHaveLength(1)
       expect(result.current.selectedLayoutId).toBe('layout-1')
       expect(collageDb.getCollageState).toHaveBeenCalledWith('test-session-id')
+    })
+
+    it('keeps a stale session ID until the user explicitly recovers', async () => {
+      localStorage.setItem(SESSION_KEY, 'missing-session-id')
+      ;(collageDb.getCollageState as jest.MockedFunction<typeof collageDb.getCollageState>)
+        .mockResolvedValue(null)
+
+      const { wrapper } = createWrapper()
+      const { result } = renderHook(() => useCollageApi(), { wrapper })
+
+      await waitFor(() => expect(result.current.sessionError?.kind).toBe('missing'))
+      expect(localStorage.getItem(SESSION_KEY)).toBe('missing-session-id')
+
+      ;(collageDb.createCollage as jest.MockedFunction<typeof collageDb.createCollage>)
+        .mockResolvedValueOnce({ id: 'recovered-session-id' })
+      ;(collageDb.getCollageState as jest.MockedFunction<typeof collageDb.getCollageState>)
+        .mockResolvedValue({ ...mockCollageState, id: 'recovered-session-id' })
+
+      await act(async () => {
+        await result.current.recoverSession()
+      })
+
+      expect(localStorage.getItem(SESSION_KEY)).toBe('recovered-session-id')
     })
   })
 })

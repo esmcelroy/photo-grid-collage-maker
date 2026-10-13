@@ -2,6 +2,7 @@ import { jest, describe, it, expect } from '@jest/globals'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
+import { axe } from 'jest-axe'
 
 // Mock framer-motion
 jest.unstable_mockModule('framer-motion', () => ({
@@ -16,6 +17,11 @@ jest.unstable_mockModule('framer-motion', () => ({
 const { UpdateToast } = await import('@/components/UpdateToast')
 
 describe('UpdateToast', () => {
+  it('has no accessibility violations with update controls visible', async () => {
+    const { container } = render(React.createElement(UpdateToast, { needRefresh: true, onRefresh: jest.fn() }))
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
   it('renders nothing when needRefresh is false', () => {
     const { container } = render(
       React.createElement(UpdateToast, { needRefresh: false, onRefresh: jest.fn() })
