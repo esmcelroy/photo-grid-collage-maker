@@ -642,14 +642,17 @@ function App() {
     const positionRevision = positionRevisionRef.current
     const shouldApplyPositions = autoPositionRequest > completedAutoPositionRequestRef.current
     async function applySmartPositions() {
-      const results = await Promise.allSettled(
-        photos.map(p => analyzePhotoWithCache(p.id, p.dataUrl))
-      )
+      // Limit decoded images and worker bitmaps in flight on memory-constrained devices.
+      const analyses: Awaited<ReturnType<typeof analyzePhotoWithCache>>[] = []
+      for (const photo of photos) {
+        if (cancelled) return
+        try {
+          analyses.push(await analyzePhotoWithCache(photo.id, photo.dataUrl))
+        } catch {
+          // One failed photo must not prevent positioning the others.
+        }
+      }
       if (cancelled) return
-
-      const analyses = results
-        .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof analyzePhotoWithCache>>> => r.status === 'fulfilled')
-        .map(r => r.value)
 
       const updatedPositions = photoPositions.map(pos => {
         const analysis = analyses.find(a => a.photoId === pos.photoId)
