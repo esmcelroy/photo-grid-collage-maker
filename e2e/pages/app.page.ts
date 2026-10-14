@@ -172,6 +172,37 @@ export class AppPage {
     await expect(this.page.getByText('Customize')).toBeVisible()
   }
 
+  async setSmartPositionEnabled(enabled: boolean) {
+    const toggle = this.page.getByRole('switch')
+    if ((await toggle.getAttribute('aria-checked')) !== String(enabled)) {
+      await toggle.click()
+    }
+    await expect(toggle).toHaveAttribute('aria-checked', String(enabled))
+  }
+
+  private firstPreviewPhoto() {
+    return this.page.getByRole('button', { name: /Edit photo in slot/ }).first()
+      .locator('xpath=ancestor::div[img][1]').locator('img')
+  }
+
+  async waitForSmartPosition() {
+    await expect(this.firstPreviewPhoto()).not.toHaveCSS('object-position', '50% 50%', { timeout: 30000 })
+    await expect(this.firstPreviewPhoto()).not.toHaveCSS('object-position', /^0% /)
+  }
+
+  async setFirstPhotoHorizontalPosition(value: number) {
+    await this.page.getByRole('button', { name: /Edit photo in slot/ }).first().click({ force: true })
+    const slider = this.page.getByLabel('Horizontal position').getByRole('slider')
+    await slider.focus()
+    await slider.press('Home')
+    for (let i = 0; i < value; i++) await slider.press('ArrowRight')
+    await this.page.getByRole('button', { name: 'Apply', exact: true }).click()
+  }
+
+  async assertFirstPhotoHorizontalPosition(value: number) {
+    await expect(this.firstPreviewPhoto()).toHaveCSS('object-position', new RegExp(`^${value}% `))
+  }
+
   /**
    * Get the current photo count from the badge.
    */

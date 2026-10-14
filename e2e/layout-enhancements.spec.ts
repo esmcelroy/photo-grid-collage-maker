@@ -175,4 +175,21 @@ test.describe('Layout Enhancements', () => {
     await expect(page.getByRole('button', { name: /undo/i })).toBeVisible()
     await expect(page.getByRole('button', { name: /redo/i })).toBeVisible()
   })
+
+  test('smart positioning preserves manual edits until explicitly reapplied', async ({ page }) => {
+    test.setTimeout(60000)
+    await app.uploadViaHiddenInput(['asymmetric.svg'])
+    await app.setSmartPositionEnabled(true)
+    await app.waitForSmartPosition()
+
+    await app.setFirstPhotoHorizontalPosition(0)
+    await app.assertFirstPhotoHorizontalPosition(0)
+    // Give background analysis time to run again if it is incorrectly self-triggering.
+    await page.waitForTimeout(2000)
+    await app.assertFirstPhotoHorizontalPosition(0)
+
+    await app.setSmartPositionEnabled(false)
+    await app.setSmartPositionEnabled(true)
+    await app.waitForSmartPosition()
+  })
 })
