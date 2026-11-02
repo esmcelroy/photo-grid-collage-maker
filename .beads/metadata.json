@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "collage",
+  "project_id": "5d29057d-2404-45b4-896a-48d9f486dea1"
+}
