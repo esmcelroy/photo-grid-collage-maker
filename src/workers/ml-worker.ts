@@ -74,32 +74,32 @@ async function initDetector(model: ModelSelection = 'face'): Promise<void> {
   postMessage({ type: 'ready' } satisfies WorkerResponse)
 }
 
-function runFaceDetection(canvas: OffscreenCanvas): FaceBox[] {
+function runFaceDetection(image: ImageBitmap): FaceBox[] {
   if (!faceDetector) return []
-  const result = faceDetector.detect(canvas)
+  const result = faceDetector.detect(image)
   return result.detections.map(d => {
     const box = d.boundingBox!
     return {
-      x: box.originX / canvas.width,
-      y: box.originY / canvas.height,
-      width: box.width / canvas.width,
-      height: box.height / canvas.height,
+      x: box.originX / image.width,
+      y: box.originY / image.height,
+      width: box.width / image.width,
+      height: box.height / image.height,
       confidence: d.categories[0]?.score ?? 0.9,
     }
   })
 }
 
-function runObjectDetection(canvas: OffscreenCanvas): ObjectBox[] {
+function runObjectDetection(image: ImageBitmap): ObjectBox[] {
   if (!objectDetector) return []
-  const result = objectDetector.detect(canvas)
+  const result = objectDetector.detect(image)
   return result.detections.map(d => {
     const box = d.boundingBox!
     const category = d.categories[0]
     return {
-      x: box.originX / canvas.width,
-      y: box.originY / canvas.height,
-      width: box.width / canvas.width,
-      height: box.height / canvas.height,
+      x: box.originX / image.width,
+      y: box.originY / image.height,
+      width: box.width / image.width,
+      height: box.height / image.height,
       confidence: category?.score ?? 0.5,
       class: category?.categoryName ?? 'unknown',
       classIndex: category?.index ?? -1,
@@ -108,26 +108,20 @@ function runObjectDetection(canvas: OffscreenCanvas): ObjectBox[] {
 }
 
 function detect(photoId: string, imageBitmap: ImageBitmap): void {
-  if (!faceDetector && !objectDetector) {
-    postMessage({ type: 'error', photoId, message: 'No detector initialized' } satisfies WorkerResponse)
-    return
-  }
-
   try {
-    const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height)
-    const ctx = canvas.getContext('2d')!
-    ctx.drawImage(imageBitmap, 0, 0)
-    imageBitmap.close()
+    if (!faceDetector && !objectDetector) {
+      throw new Error('No detector initialized')
+    }
 
     if (activeModel === 'both') {
-      const faces = runFaceDetection(canvas)
-      const objects = runObjectDetection(canvas)
+      const faces = runFaceDetection(imageBitmap)
+      const objects = runObjectDetection(imageBitmap)
       postMessage({ type: 'combined-result', photoId, faces, objects } satisfies WorkerResponse)
     } else if (activeModel === 'object') {
-      const objects = runObjectDetection(canvas)
+      const objects = runObjectDetection(imageBitmap)
       postMessage({ type: 'combined-result', photoId, faces: [], objects } satisfies WorkerResponse)
     } else {
-      const faces = runFaceDetection(canvas)
+      const faces = runFaceDetection(imageBitmap)
       postMessage({ type: 'result', photoId, faces } satisfies WorkerResponse)
     }
   } catch (err) {
@@ -136,6 +130,9 @@ function detect(photoId: string, imageBitmap: ImageBitmap): void {
       photoId,
       message: err instanceof Error ? err.message : 'Detection failed',
     } satisfies WorkerResponse)
+  } finally {
+    // The worker owns the transferred bitmap, including on inference failure.
+    imageBitmap.close()
   }
 }
 
