@@ -6,6 +6,8 @@ import type { PhotoPosition, UploadedPhoto } from '@/lib/types'
 
 const updatePositions = jest.fn<(positions: PhotoPosition[]) => Promise<void>>()
 const analyzePhotoWithCache = jest.fn<(photoId: string, dataUrl: string) => Promise<PhotoAnalysis>>()
+const addPhoto = jest.fn<(photo: { id: string; dataUrl: string; fileName: string }) => Promise<void>>()
+const correctExifOrientation = jest.fn<(file: File) => Promise<{ dataUrl: string; exifOrientation: number }>>()
 const toastError = jest.fn()
 const initMLWorker = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
 let smartPositionMode: 'basic' | 'standard' | 'advanced' = 'basic'
@@ -16,7 +18,7 @@ let smartPositionEnabled = false
 let collageState: {
   collageId: string
   photos: UploadedPhoto[]
-  selectedLayoutId: string
+  selectedLayoutId: string | null
   photoPositions: PhotoPosition[]
 } = {} as never
 
@@ -34,7 +36,7 @@ jest.unstable_mockModule('@/hooks/useCollageApi', () => ({
     settings: { gap: 8, backgroundColor: 'transparent', borderRadius: 0 },
     isLoading: false,
     initCollage: jest.fn(),
-    addPhoto: jest.fn(),
+    addPhoto,
     removePhoto: jest.fn(),
     updateLayout: jest.fn(),
     updatePositions,
@@ -75,7 +77,14 @@ jest.unstable_mockModule('@/components/CollagePreview', () => ({
     <button onClick={() => onPositionsChange([{ ...photoPositions[0], objectPosition: '10% 20%' }])}>Manual crop</button>
   ),
 }))
-jest.unstable_mockModule('@/components/UploadZone', () => ({ UploadZone: () => null }))
+jest.unstable_mockModule('@/lib/image-utils', () => ({
+  correctExifOrientation,
+  generateUniqueId: () => crypto.randomUUID(),
+  downloadCollage: jest.fn(),
+}))
+jest.unstable_mockModule('@/lib/heic-utils', () => ({
+  processFilesForHeic: async (files: File[]) => ({ converted: files, errors: [] }),
+}))
 jest.unstable_mockModule('@/components/PhotoThumbnail', () => ({ PhotoThumbnail: () => null }))
 jest.unstable_mockModule('@/components/ProjectLibrary', () => ({ ProjectLibrary: () => null }))
 jest.unstable_mockModule('@/components/LayoutGallery', () => ({ LayoutGallery: () => null }))
@@ -142,6 +151,60 @@ describe('smart positioning integration', () => {
     await waitFor(() => expect(updatePositions).toHaveBeenCalledTimes(1))
     await act(async () => {})
     expect(analyzePhotoWithCache).toHaveBeenCalledTimes(1)
+  })
+
+  it('bounds upload preparation and waits for the batch before Advanced analysis, including a failed file', async () => {
+    smartPositionEnabled = true
+    smartPositionMode = 'advanced'
+    workerStatus = 'ready'
+    collageState = { ...collageState, photos: [], photoPositions: [], selectedLayoutId: null }
+    const first = deferred<void>()
+    const last = deferred<void>()
+    let activeImages = 0
+    let peakImages = 0
+    let analysisDuringUpload = false
+    let batchFinished = false
+    const analyzedIds = new Set<string>()
+    correctExifOrientation.mockImplementation(async file => {
+      activeImages++
+      peakImages = Math.max(peakImages, activeImages)
+      try {
+        if (file.name === 'first.jpg') await first.promise
+        if (file.name === 'broken.jpg') throw new Error('Invalid image')
+        if (file.name === 'last.jpg') await last.promise
+        return { dataUrl: `data:image/jpeg;base64,${file.name}`, exifOrientation: 1 }
+      } finally {
+        activeImages--
+      }
+    })
+    analyzePhotoWithCache.mockImplementation(async id => {
+      analysisDuringUpload ||= !batchFinished
+      analyzedIds.add(id)
+      return analysis(id)
+    })
+    const view = render(<App />)
+    addPhoto.mockImplementation(async uploaded => {
+      collageState = {
+        ...collageState,
+        photos: [...collageState.photos, { id: uploaded.id, dataUrl: uploaded.dataUrl, file: new File([], uploaded.fileName) }],
+        photoPositions: [{ photoId: uploaded.id, gridArea: 'a' }],
+      }
+      if (uploaded.fileName === 'last.jpg') batchFinished = true
+      view.rerender(<App />)
+    })
+    const files = ['first.jpg', 'broken.jpg', 'last.jpg'].map(name => new File(['photo'], name, { type: 'image/jpeg' }))
+    fireEvent.change(view.container.querySelector('input[accept^="image/"]')!, { target: { files } })
+    await waitFor(() => expect(activeImages).toBeGreaterThan(0))
+    await act(async () => { first.resolve() })
+    await waitFor(() => expect(collageState.photos).toHaveLength(1))
+    expect(screen.queryByText('Preview', { exact: true })).not.toBeInTheDocument()
+    await act(async () => { last.resolve() })
+    await waitFor(() => expect(collageState.photos).toHaveLength(2))
+    await waitFor(() => expect(analyzedIds).toEqual(new Set(collageState.photos.map(p => p.id))))
+    expect(screen.getByText('Preview', { exact: true })).toBeInTheDocument()
+    expect(collageState.photos.map(p => p.file.name)).toEqual(['first.jpg', 'last.jpg'])
+    expect(peakImages).toBe(1)
+    expect(analysisDuringUpload).toBe(false)
   })
 
   it('ignores an older analysis result when photo input changes', async () => {

@@ -1,4 +1,5 @@
-import { jest, describe, it, expect, beforeEach } from '@jest/globals'
+import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals'
+import type { WorkerRequest } from '@/workers/ml-worker'
 
 // Mock the worker constructor globally
 const mockPostMessage = jest.fn()
@@ -30,6 +31,8 @@ const {
   disposeMLWorker,
   getWorkerStatus,
   hasNativeFaceDetector,
+  detectFacesML,
+  detectCombined,
 } = await import('@/lib/ml-worker-client')
 
 describe('ml-worker-client', () => {
@@ -171,6 +174,101 @@ describe('ml-worker-client', () => {
       expect(statuses).toContain('loading')
       expect(statuses).toContain('ready')
       unsub()
+    })
+  })
+
+  describe('bounded detection images', () => {
+    const NativeImage = globalThis.Image
+    const originalCreateBitmap = Object.getOwnPropertyDescriptor(globalThis, 'createImageBitmap')
+    const decodeImage = jest.fn<() => Promise<void>>()
+    let width = 4032
+    let height = 3024
+    let preparedBitmap: ImageBitmap
+
+    beforeEach(() => {
+      decodeImage.mockReset().mockResolvedValue(undefined)
+      globalThis.Image = jest.fn(() => {
+        const image = new NativeImage()
+        Object.defineProperties(image, {
+          naturalWidth: { value: width },
+          naturalHeight: { value: height },
+          decode: { value: decodeImage },
+        })
+        return image
+      }) as unknown as typeof Image
+      jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: () => {} } as unknown as CanvasRenderingContext2D)
+      Object.defineProperty(globalThis, 'createImageBitmap', {
+        configurable: true,
+        value: async (source: Blob | HTMLCanvasElement) => {
+          let bitmapWidth = source instanceof Blob ? width : source.width
+          let bitmapHeight = source instanceof Blob ? height : source.height
+          preparedBitmap = {
+            get width() { return bitmapWidth },
+            get height() { return bitmapHeight },
+            close() { bitmapWidth = 0; bitmapHeight = 0 },
+          } as ImageBitmap
+          return preparedBitmap
+        },
+      })
+    })
+
+    afterEach(() => {
+      globalThis.Image = NativeImage
+      if (originalCreateBitmap) Object.defineProperty(globalThis, 'createImageBitmap', originalCreateBitmap)
+      else delete (globalThis as Record<string, unknown>).createImageBitmap
+      mockPostMessage.mockReset()
+      jest.restoreAllMocks()
+    })
+
+    async function ready(model: 'face' | 'both') {
+      const initialization = initMLWorker(model)
+      await new Promise(resolve => setTimeout(resolve, 10))
+      mockOnMessage!(new MessageEvent('message', { data: { type: 'ready' } }))
+      await initialization
+    }
+
+    it.each([
+      ['face', 4032, 3024, 1024, 768],
+      ['both', 3000, 5000, 614, 1024],
+      ['both', 173, 281, 173, 281],
+    ] as const)('bounds %s inference for %i × %i without upscaling or changing normalized results', async (model, w, h, expectedWidth, expectedHeight) => {
+      width = w
+      height = h
+      await ready(model)
+      let transferredSize: number[] = []
+      const faces = [{ x: 0.2, y: 0.3, width: 0.1, height: 0.4, confidence: 0.9 }]
+      mockPostMessage.mockImplementation((message: unknown) => {
+        const request = message as WorkerRequest
+        if (request.type !== 'detect') return
+        transferredSize = [request.imageData!.width, request.imageData!.height]
+        mockOnMessage!(new MessageEvent('message', {
+          data: { type: model === 'face' ? 'result' : 'combined-result', photoId: request.photoId, faces, objects: [] },
+        }))
+      })
+
+      const result = await (model === 'face' ? detectFacesML('photo', 'data:image/jpeg;base64,AAAA') : detectCombined('photo', 'data:image/jpeg;base64,AAAA'))
+      expect(transferredSize).toEqual([expectedWidth, expectedHeight])
+      expect(result).toEqual(model === 'face' ? faces : { faces, objects: [] })
+    })
+
+    it('rejects an obsolete image after disposal and releases its bitmap', async () => {
+      await ready('both')
+      let finishDecoding!: () => void
+      decodeImage.mockImplementation(() => new Promise(resolve => { finishDecoding = resolve }))
+      const detection = detectCombined('photo', 'data:image/jpeg;base64,AAAA')
+      const rejection = expect(detection).rejects.toThrow('ML Worker changed during image preparation')
+      disposeMLWorker()
+      finishDecoding()
+      await rejection
+      expect([preparedBitmap.width, preparedBitmap.height]).toEqual([0, 0])
+    })
+
+    it('rejects failed transfers immediately and releases the untransferred bitmap', async () => {
+      await ready('both')
+      mockPostMessage.mockImplementation(() => { throw new Error('Transfer failed') })
+      await expect(detectCombined('photo', 'data:image/jpeg;base64,AAAA')).rejects.toThrow('Transfer failed')
+      expect([preparedBitmap.width, preparedBitmap.height]).toEqual([0, 0])
+      mockPostMessage.mockReset()
     })
   })
 })

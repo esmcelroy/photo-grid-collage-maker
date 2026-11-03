@@ -145,6 +145,7 @@ function App() {
   const [editingArea, setEditingArea] = useState<string | null>(null)
   const settingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const uploadInProgressRef = useRef(false)
+  const [isUploading, setIsUploading] = useState(false)
   const collageIdRef = useRef(collageId)
   collageIdRef.current = collageId
   const [availableLayouts, setAvailableLayouts] = useState<GridLayout[]>([])
@@ -340,6 +341,7 @@ function App() {
   }, [collageId, isInitializing, initError])
 
   useEffect(() => {
+    if (isUploading) return
     const layouts = getLayoutsForPhotoCount(photos.length)
     setAvailableLayouts(layouts)
 
@@ -358,7 +360,7 @@ function App() {
     } else if (photos.length === 0) {
       setSelectedLayout(null)
     }
-  }, [photos, selectedLayoutId]) // updateLayout excluded — stable ref via useCollageApi
+  }, [photos, selectedLayoutId, isUploading]) // updateLayout excluded — stable ref via useCollageApi
 
   useEffect(() => {
     if (selectedLayoutId) {
@@ -378,6 +380,7 @@ function App() {
       return
     }
     uploadInProgressRef.current = true
+    setIsUploading(true)
     try {
       const remaining = MAX_PHOTOS - photos.length
       const toAdd = files.slice(0, remaining)
@@ -400,24 +403,29 @@ function App() {
         return
       }
 
-      const results = await Promise.allSettled(
-        converted.map(async (file) => {
+      let addedCount = 0
+      const failures: unknown[] = []
+      // EXIF correction can decode a full-resolution image and canvas.
+      // Finish and persist one photo before preparing the next.
+      for (const file of converted) {
+        try {
           const { dataUrl } = await correctExifOrientation(file)
           if (collageIdRef.current !== uploadSessionId) {
             throw new Error('The active collage changed during upload')
           }
           const id = generateUniqueId()
           await addPhoto({ id, dataUrl, fileName: file.name })
-        })
-      )
-      const addedCount = results.filter((result) => result.status === 'fulfilled').length
-      const failedResults = results.filter((result) => result.status === 'rejected')
-      const failedCount = errors.length + failedResults.length
+          addedCount++
+        } catch (error) {
+          failures.push(error)
+        }
+      }
+      const failedCount = errors.length + failures.length
 
       if (addedCount > 0) {
         toast.success(`Added ${addedCount} ${addedCount === 1 ? 'photo' : 'photos'}`)
       }
-      if (failedResults.some((result) => isQuotaExceededError(result.reason))) {
+      if (failures.some(isQuotaExceededError)) {
         toast.error('Storage is full. Remove photos or clear this collage, then try again. Existing photos were not changed.')
       } else if (failedCount > 0) {
         toast.error(`${failedCount} ${failedCount === 1 ? 'photo could' : 'photos could'} not be added.`)
@@ -427,6 +435,7 @@ function App() {
       console.error(error)
     } finally {
       uploadInProgressRef.current = false
+      setIsUploading(false)
     }
   }, [photos.length, collageId, addPhoto])
 
@@ -630,7 +639,9 @@ function App() {
   // Auto-apply only for explicit smart-position triggers. Completion updates
   // ranking/color suggestions, but is deliberately not an analysis trigger.
   useEffect(() => {
-    if (!smartPositionEnabled || !selectedLayout || photos.length === 0) return
+    // Persisted photos arrive individually. Do not start overlapping analysis
+    // passes for every partial batch while upload decoding is still in flight.
+    if (isUploading || !smartPositionEnabled || !selectedLayout || photos.length === 0) return
 
     const needsWorker = detectionMode === 'advanced' || (detectionMode === 'standard' && !hasNativeFaceDetector())
     if (needsWorker && workerStatus !== 'ready') return
@@ -688,7 +699,7 @@ function App() {
     // photoPositions is intentionally excluded: changes invalidate the request
     // through positionRevisionRef but must not reapply smart positioning.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPositionRequest, collageId, detectionMode, photoInputKey, selectedLayout, smartPositionEnabled, workerStatus])
+  }, [autoPositionRequest, collageId, detectionMode, isUploading, photoInputKey, selectedLayout, smartPositionEnabled, workerStatus])
 
   // Derived state for edit dialog
   const editingPosition = editingArea

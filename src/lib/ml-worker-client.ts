@@ -160,7 +160,12 @@ export async function detectFacesML(photoId: string, dataUrl: string): Promise<F
     throw new Error('ML Worker not ready')
   }
 
+  const detectionWorker = worker
   const imageBitmap = await dataUrlToImageBitmap(dataUrl)
+  if (worker !== detectionWorker || status !== 'ready') {
+    imageBitmap.close()
+    throw new Error('ML Worker changed during image preparation')
+  }
 
   return new Promise<FaceBox[]>((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -184,10 +189,17 @@ export async function detectFacesML(photoId: string, dataUrl: string): Promise<F
       },
     })
 
-    worker!.postMessage(
-      { type: 'detect', photoId, imageData: imageBitmap },
-      [imageBitmap] // Transfer ownership
-    )
+    try {
+      detectionWorker.postMessage(
+        { type: 'detect', photoId, imageData: imageBitmap },
+        [imageBitmap] // Transfer ownership
+      )
+    } catch (error) {
+      pendingDetections.delete(photoId)
+      clearTimeout(timeout)
+      imageBitmap.close()
+      reject(error)
+    }
   })
 }
 
@@ -205,7 +217,12 @@ export async function detectCombined(photoId: string, dataUrl: string): Promise<
     throw new Error('Worker not initialized with object detection model')
   }
 
+  const detectionWorker = worker
   const imageBitmap = await dataUrlToImageBitmap(dataUrl)
+  if (worker !== detectionWorker || status !== 'ready') {
+    imageBitmap.close()
+    throw new Error('ML Worker changed during image preparation')
+  }
 
   return new Promise<CombinedDetectionResult>((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -228,24 +245,43 @@ export async function detectCombined(photoId: string, dataUrl: string): Promise<
       },
     })
 
-    worker!.postMessage(
-      { type: 'detect', photoId, imageData: imageBitmap },
-      [imageBitmap]
-    )
+    try {
+      detectionWorker.postMessage(
+        { type: 'detect', photoId, imageData: imageBitmap },
+        [imageBitmap]
+      )
+    } catch (error) {
+      pendingDetections.delete(photoId)
+      clearTimeout(timeout)
+      imageBitmap.close()
+      reject(error)
+    }
   })
 }
 
+// Inference does not need export-resolution pixels. Bound the bitmap before
+// transfer so both MediaPipe runtimes also upload only a small working image.
+const MAX_DETECTION_DIMENSION = 1024
+
 async function dataUrlToImageBitmap(dataUrl: string): Promise<ImageBitmap> {
-  // Convert data URL to blob without fetch() to avoid CSP connect-src violations
-  const [header, base64] = dataUrl.split(',')
-  const mime = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg'
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i)
+  const image = new Image()
+  const canvas = document.createElement('canvas')
+  try {
+    image.src = dataUrl
+    await image.decode()
+    const scale = Math.min(1, MAX_DETECTION_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight))
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Could not prepare image for detection')
+    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+    return await createImageBitmap(canvas)
+  } finally {
+    // Safari can retain canvas backing stores until explicitly reset.
+    canvas.width = 0
+    canvas.height = 0
+    image.removeAttribute('src')
   }
-  const blob = new Blob([bytes], { type: mime })
-  return createImageBitmap(blob)
 }
 
 export function disposeMLWorker(): void {
