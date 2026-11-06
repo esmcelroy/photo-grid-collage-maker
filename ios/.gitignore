@@ -1,0 +1,16 @@
+# Xcode per-user state
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+# Build and test output
+DerivedData/
+build/
+.build/
+*.xcresult
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# Local simulator captures; they may contain photos
+screenshots/

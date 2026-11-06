@@ -73,3 +73,9 @@
 
 sync:
     remote: "git+ssh://git@github.com/esmcelroy/photo-grid-collage-maker.git"
+    auto-push: false
+export:
+    auto: true
+    git-add: false
+backup:
+    git-push: false

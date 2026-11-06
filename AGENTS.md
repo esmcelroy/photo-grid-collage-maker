@@ -88,3 +88,10 @@ This is a **fully client-side** application. All data persists in the browser vi
   Playwright reports, IndexedDB artifacts, or user photos.
 - `.agents/setup` installs the pinned Node toolchain, locked dependencies, and Chromium/WebKit for Debian orbs; do not run its system installer on macOS. `.agents/resume` is intentionally a no-op for this client-only app.
 - GitHub requires pull requests to update `main`; push work to a feature/integration branch and do not bypass the rule or manually trigger deployment.
+
+## Backlog and native iOS work
+
+- Use Beads (`bd`) for the native backlog. Run `bd prime` and `bd ready` at session start; claim work before implementation and close only after verification. The first native milestone is `collage-ios`.
+- Beads uses a local Dolt database; `.beads/issues.jsonl` is an interchange snapshot, not a full database backup. Do not assume Git alone synchronizes live issue state. Do not push Git or Dolt remotes without authorization.
+- Native app scope and conventions live in `ios/AGENTS.md`. Keep web behavior intact; browser-specific implementation rules above apply to the web app, not SwiftUI.
+- The user prefers independently owned development tasks delegated to Claude and Grok subscription-backed sub-threads when useful. Confirm active subscription connections, give each writer separate file ownership or a worktree, and keep integration and verification with the checkout owning the change. Do not substitute paid API connections silently.
