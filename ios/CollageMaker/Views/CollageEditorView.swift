@@ -1,18 +1,35 @@
 import SwiftUI
 
 /// An explicit draft: Cancel never writes, and Save dismisses only after persistence succeeds.
+/// While the draft has unsaved changes, swiping the sheet down cannot discard it, and Cancel
+/// asks for confirmation before discarding.
 struct CollageEditorView: View {
     @Environment(\.dismiss) private var dismiss
-    @State var draft: CollageProject
+    @State private var draft: CollageProject
+    /// The project as opened, to tell whether the draft has unsaved changes.
+    private let opened: CollageProject
     let catalog: LayoutCatalog
     let store: ProjectStore
     let originalURLs: [UUID: URL]
     let onSave: (CollageProject) -> Void
+
+    init(
+        draft: CollageProject, catalog: LayoutCatalog, store: ProjectStore,
+        originalURLs: [UUID: URL], onSave: @escaping (CollageProject) -> Void
+    ) {
+        _draft = State(initialValue: draft)
+        opened = draft
+        self.catalog = catalog
+        self.store = store
+        self.originalURLs = originalURLs
+        self.onSave = onSave
+    }
     @State private var selectedArea = ""
     @State private var swapArea = ""
     @State private var saving = false
     @State private var saveError: String?
     @State private var showingStyle = false
+    @State private var confirmingDiscard = false
 
     var body: some View {
         NavigationStack {
@@ -164,13 +181,23 @@ struct CollageEditorView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
-                        dismiss()
+                        if draft == opened { dismiss() } else { confirmingDiscard = true }
                     } label: {
                         Image(systemName: "xmark")
                             .frame(minWidth: 44, minHeight: 44)
                     }
                     .accessibilityLabel("Cancel")
                     .disabled(saving)
+                    // An alert, not a confirmation dialog: on iOS 26 the dialog becomes a popover
+                    // with no visible Keep Editing button and labels that ignore Dynamic Type.
+                    .alert("Discard changes?", isPresented: $confirmingDiscard) {
+                        Button("Keep Editing", role: .cancel) {}
+                            .accessibilityIdentifier("keepEditing")
+                        Button("Discard Changes", role: .destructive) { dismiss() }
+                            .accessibilityIdentifier("discardEdits")
+                    } message: {
+                        Text("Your edits to this collage haven't been saved.")
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
@@ -186,7 +213,7 @@ struct CollageEditorView: View {
                     .accessibilityIdentifier("saveEdits")
                 }
             }
-            .interactiveDismissDisabled(saving)
+            .interactiveDismissDisabled(saving || draft != opened)
             .sheet(isPresented: $showingStyle) {
                 // Edits the same draft; only the editor's Save persists them.
                 NavigationStack {

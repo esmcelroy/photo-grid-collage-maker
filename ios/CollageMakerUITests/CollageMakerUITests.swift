@@ -135,7 +135,25 @@ final class CollageMakerUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Zoom: 100%"].exists)
         XCTAssertEqual(app.sliders["Horizontal position"].value as? String, "50 percent")
         XCTAssertEqual(app.sliders["Vertical position"].value as? String, "50 percent")
+
+        // An edited draft cannot be swiped away; Cancel asks before discarding it.
+        let editorBar = app.navigationBars["Edit collage"]
+        editorBar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98)))
+        XCTAssertTrue(editorBar.waitForExistence(timeout: 3))
+        XCTAssertEqual(app.staticTexts["photoRotation"].label, "Rotation: 0°")
         app.buttons["Cancel"].tap()
+        let discardAlert = app.alerts["Discard changes?"]
+        XCTAssertTrue(discardAlert.waitForExistence(timeout: 5))
+        attachScreenshot(of: app, named: "editor-discard-alert")
+        try auditDiscardAlert(discardAlert, in: app)
+        app.buttons["keepEditing"].firstMatch.tap()
+        XCTAssertTrue(discardAlert.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["photoRotation"].label, "Rotation: 0°")
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(discardAlert.waitForExistence(timeout: 5))
+        app.buttons["discardEdits"].firstMatch.tap()
+        XCTAssertTrue(editorBar.waitForNonExistence(timeout: 5))
         app.buttons["editCollage"].tap()
         XCTAssertTrue(reveal(app.staticTexts["photoRotation"], in: app))
         XCTAssertEqual(app.staticTexts["photoRotation"].label, "Rotation: 90°")
@@ -212,6 +230,7 @@ final class CollageMakerUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["backgroundStatus"].label, "Background: Black")
         app.buttons["closeStyle"].tap()
         app.buttons["Cancel"].tap()
+        app.buttons["discardEdits"].firstMatch.tap()
         app.buttons["editCollage"].tap()
         openStyle(in: app)
         XCTAssertEqual(gap.value as? String, savedGap)
@@ -491,6 +510,40 @@ final class CollageMakerUITests: XCTestCase {
             return true
         }
         try app.performAccessibilityAudit(for: .all.subtracting(.contrast))
+    }
+
+    /// Audits the editor's discard confirmation. UIAlertController owns the alert's title and
+    /// message fonts, so only Dynamic Type reports on exactly those two system labels are exempt;
+    /// contrast and every other category stay unfiltered, as do the alert's buttons.
+    /// On iOS 26.3 the alert also reports one element-less duplicate of the same UILabel issue per
+    /// label; at most that many are accepted, and only while this alert is presented.
+    private func auditDiscardAlert(_ alert: XCUIElement, in app: XCUIApplication) throws {
+        let systemLabels: Set<String> = ["Discard changes?", "Your edits to this collage haven't been saved."]
+        XCTAssertTrue(systemLabels.allSatisfy { alert.staticTexts[$0].exists })
+        try app.performAccessibilityAudit(for: .contrast)
+        var elementlessDuplicates = 0
+        try app.performAccessibilityAudit(for: .all.subtracting(.contrast)) { issue in
+            guard issue.auditType == .dynamicType, alert.exists else { return false }
+            let detail: String
+            if let element = issue.element {
+                guard element.elementType == .staticText, systemLabels.contains(element.label),
+                      alert.staticTexts[element.label].exists
+                else { return false }
+                detail = "System alert Dynamic Type exception: \(element.label)"
+            } else {
+                guard issue.detailedDescription.contains("font size of this UILabel"),
+                      elementlessDuplicates < systemLabels.count
+                else { return false }
+                elementlessDuplicates += 1
+                detail = "System alert Dynamic Type exception: element-less UILabel duplicate \(elementlessDuplicates) while the alert is presented"
+            }
+            let attachment = XCTAttachment(string: detail)
+            attachment.name = "System alert Dynamic Type exception"
+            attachment.lifetime = .keepAlways
+            self.add(attachment)
+            print(detail)
+            return true
+        }
     }
 
     private func attachScreenshot(of app: XCUIApplication, named name: String) {
