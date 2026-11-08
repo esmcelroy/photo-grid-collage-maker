@@ -14,6 +14,7 @@ struct ProjectView: View {
     @State private var reload = 0
     @State private var editing = false
     @State private var importing = false
+    @State private var exporting = false
 
     var body: some View {
         NavigationStack {
@@ -31,7 +32,7 @@ struct ProjectView: View {
                     } else if let layout = layout {
                         CollagePreview(CollagePreviewRequest(
                             project: project, layout: layout, originalURLs: originalURLs,
-                            compositionSize: CGSize(width: 400, height: 400 / layout.aspectRatio),
+                            compositionSize: layout.compositionSize,
                             maximumPixelSize: 1200
                         ))
                         .accessibilityIdentifier("projectPreview")
@@ -45,6 +46,12 @@ struct ProjectView: View {
                             .controlSize(.large)
                             .disabled(importing || loadingOriginals || readError != nil)
                             .accessibilityIdentifier("editCollage")
+
+                        Button("Export", systemImage: "square.and.arrow.up") { exporting = true }
+                            .buttonStyle(.bordered)
+                            .controlSize(.large)
+                            .disabled(importing || loadingOriginals || readError != nil || layout == nil)
+                            .accessibilityIdentifier("exportCollage")
                     }
 
                     PhotoImportButton(store: store, projectID: project.id, photoCount: project.photos.count,
@@ -94,6 +101,11 @@ struct ProjectView: View {
                 }
             }
             .task(id: reload) { await loadOriginals() }
+            .sheet(isPresented: $exporting) {
+                if let layout {
+                    ExportView(project: project, layout: layout, originalURLs: originalURLs)
+                }
+            }
             .sheet(isPresented: $editing) {
                 CollageEditorView(draft: project, catalog: catalog, store: store, originalURLs: originalURLs) { saved in
                     guard saved.id == project.id else { return }

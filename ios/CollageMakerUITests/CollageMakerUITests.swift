@@ -106,6 +106,7 @@ final class CollageMakerUITests: XCTestCase {
         attachScreenshot(of: app, named: "editor-edited-preview")
         app.buttons["saveEdits"].tap()
         XCTAssertTrue(app.buttons["editCollage"].waitForExistence(timeout: 10))
+        try exportThroughShareSheet(in: app)
         app.buttons["closeProject"].tap()
         let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "savedProject-", "2 of 16 photos")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 10))
@@ -222,10 +223,8 @@ final class CollageMakerUITests: XCTestCase {
         XCTAssertEqual(radius.value as? String, savedRadius)
         XCTAssertEqual(app.staticTexts["backgroundStatus"].label, customBackground)
 
-        gap.adjust(toNormalizedSliderPosition: 0)
-        XCTAssertEqual(gap.value as? String, "0 points")
-        radius.adjust(toNormalizedSliderPosition: 1)
-        XCTAssertEqual(radius.value as? String, "32 points")
+        drag(gap, to: 0, expecting: "0 points")
+        drag(radius, to: 1, expecting: "32 points")
         selectBackground("Black", in: app)
         XCTAssertEqual(app.staticTexts["backgroundStatus"].label, "Background: Black")
         app.buttons["closeStyle"].tap()
@@ -271,6 +270,87 @@ final class CollageMakerUITests: XCTestCase {
         attachScreenshot(of: app, named: "editor-style-large-text-backgrounds")
         try app.performAccessibilityAudit(for: .contrast)
         try app.performAccessibilityAudit(for: .all.subtracting(.contrast))
+
+        // The unchanged draft closes without a discard prompt; then check export at large text.
+        app.buttons["closeStyle"].tap()
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(reveal(app.buttons["exportCollage"], in: app))
+        app.buttons["exportCollage"].tap()
+        XCTAssertTrue(app.buttons["exportCreate"].waitForExistence(timeout: 10))
+        attachScreenshot(of: app, named: "export-large-text")
+        try app.performAccessibilityAudit(for: .contrast)
+        try app.performAccessibilityAudit(for: .all.subtracting(.contrast))
+        // The options scroll above the pinned Create Image button.
+        XCTAssertTrue(reveal(app.textFields["exportWidth"], in: app))
+        XCTAssertTrue(app.buttons["exportCreate"].isHittable)
+        attachScreenshot(of: app, named: "export-large-text-custom-size")
+    }
+
+    /// Creates a real export and opens the system share sheet. Exact pixels and formats are
+    /// decoded in CollageExporterTests; this proves the visible flow and the Save Image path.
+    private func exportThroughShareSheet(in app: XCUIApplication) throws {
+        XCTAssertTrue(reveal(app.buttons["exportCollage"], in: app))
+        app.buttons["exportCollage"].tap()
+        let create = app.buttons["exportCreate"]
+        XCTAssertTrue(create.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["exportPreset.web"].isSelected)
+        attachScreenshot(of: app, named: "export-default")
+        try app.performAccessibilityAudit()
+
+        app.buttons["exportPreset.social"].tap()
+        XCTAssertTrue(app.buttons["exportPreset.social"].isSelected)
+        let width = try XCTUnwrap(app.textFields["exportWidth"].value as? String)
+        let height = try XCTUnwrap(app.textFields["exportHeight"].value as? String)
+        XCTAssertTrue(width == "1080" || height == "1080", "\(width) × \(height)")
+        app.segmentedControls["exportFormat"].buttons["JPEG"].tap()
+        XCTAssertTrue(app.sliders["exportQuality"].waitForExistence(timeout: 5))
+        create.tap()
+        let status = app.staticTexts["exportStatus"]
+        XCTAssertTrue(status.waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertTrue(status.label.contains(".jpg, \(width) × \(height) px"), status.label)
+        XCTAssertTrue(reveal(app.buttons["exportShare"], in: app))
+        attachScreenshot(of: app, named: "export-ready")
+        try app.performAccessibilityAudit()
+
+        app.buttons["exportShare"].tap()
+        let shareSheet = app.otherElements["ShareSheet.RemoteContainerView"]
+        XCTAssertTrue(app.cells["Copy"].firstMatch.waitForExistence(timeout: 15), app.debugDescription)
+        attachScreenshot(of: app, named: "export-share-sheet")
+        // iOS lists Save Image (an action cell) unless add-only Photos access was denied
+        // earlier. When offered, it must reach the system prompt without crashing the app.
+        let saveImage = app.cells["Save Image"].firstMatch
+        if saveImage.exists {
+            saveImage.tap()
+            // Deny, so the seeded library used by the picker steps is never changed.
+            let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+            let deny = springboard.alerts.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Don")).firstMatch
+            if deny.waitForExistence(timeout: 5) {
+                attachScreenshot(of: app, named: "export-photos-add-prompt")
+                deny.tap()
+            }
+            XCTAssertEqual(app.state, .runningForeground)
+        }
+        if shareSheet.waitForExistence(timeout: 2) {
+            shareSheet.swipeDown()
+        }
+        XCTAssertTrue(app.buttons["exportShare"].waitForExistence(timeout: 10), app.debugDescription)
+
+        // A changed option invalidates the prepared file.
+        app.buttons["exportPreset.web"].tap()
+        XCTAssertFalse(app.staticTexts["exportStatus"].exists)
+        XCTAssertFalse(app.buttons["exportShare"].exists)
+        XCTAssertTrue(app.buttons["exportCreate"].exists)
+        app.buttons["closeExport"].tap()
+        XCTAssertTrue(app.buttons["editCollage"].waitForExistence(timeout: 10))
+    }
+
+    /// Drags a stepped slider to the end of its track. One coordinate drag to an end can stop
+    /// a step or more short on iOS 26, so repeat the same drag a bounded number of times.
+    private func drag(_ slider: XCUIElement, to position: CGFloat, expecting value: String, attempts: Int = 4) {
+        for _ in 0..<attempts where slider.value as? String != value {
+            slider.adjust(toNormalizedSliderPosition: position)
+        }
+        XCTAssertEqual(slider.value as? String, value)
     }
 
     private func openStyle(in app: XCUIApplication) {
