@@ -123,6 +123,70 @@ struct CollageExporterTests {
         #expect(try exportedFiles(in: exporter) == [retried.fileURL.resolvingSymlinksInPath()])
     }
 
+    @Test func sixteenCameraOriginalsReopenAndExportEverySlot() async throws {
+        let fixture = try Fixture()
+        let catalog = try LayoutCatalog()
+        let root = fixture.directory.appending(path: "store")
+        let store = ProjectStore(rootURL: root, catalog: catalog)
+        let project = try await store.createProject(name: "Sixteen camera originals")
+        // Distinct row/column colors make a missing, duplicated or transposed slot fail.
+        let colors = (0..<16).map { index in
+            [40 + (index / 4) * 55, 35 + (index % 4) * 55, 120]
+        }
+        let items = try colors.map { CameraItem(original: try fixture.cameraJPEG($0)) }
+        let importer = PhotoImporter(store: store)
+        let imported = try await importer.importPhotos(items, into: project.id)
+        #expect(imported.imported.count == 16)
+        #expect(imported.failures.isEmpty)
+        #expect(imported.imported.allSatisfy { $0.photo.pixelWidth == 3024 && $0.photo.pixelHeight == 4032 })
+        let overflow = try await importer.importPhotos([items[0]], into: project.id)
+        #expect(overflow.imported.isEmpty)
+        #expect(overflow.failures.map(\.reason) == [.photoLimitReached])
+
+        let reopenedStore = ProjectStore(rootURL: root, catalog: catalog)
+        var reopened = try await reopenedStore.loadProject(project.id)
+        #expect(reopened.photos == imported.imported.map(\.photo))
+        #expect(reopened.selectedLayoutID == "16-grid-4x4")
+        reopened.settings = CollageSettings(gap: 0, background: .transparent, borderRadius: 16)
+        reopened = try await reopenedStore.saveProject(reopened)
+        let layout = try #require(catalog.layout(id: "16-grid-4x4"))
+        var originals: [UUID: URL] = [:]
+        for photo in reopened.photos {
+            originals[photo.id] = try await reopenedStore.originalURL(photoID: photo.id, in: reopened.id)
+        }
+        let exporter = CollageExporter(temporaryRoot: fixture.directory.appending(path: "exports"))
+        // Exercise the near-40 MP boundary, not only a tiny sixteen-slot bitmap.
+        let size = ExportDimensions(width: 8192, height: 4882)
+        for format in [CollageRenderFormat.png, .jpeg] {
+            let started = Date()
+            let result = try await exporter.export(CollageExportRequest(
+                project: reopened, layout: layout, originalURLs: originals,
+                dimensions: size, format: format, jpegQuality: 0.9, filename: reopened.name
+            ))
+            try autoreleasepool {
+                let image = try Decoded(contentsOf: result.fileURL)
+                #expect(image.width == 8192 && image.height == 4882)
+                #expect(image.type == (format == .png ? UTType.png.identifier : UTType.jpeg.identifier))
+                for index in 0..<16 {
+                    // Independent centers of the 4×4 grid; never ask production geometry.
+                    let pixel = image.pixel((index % 4) * 2048 + 1024, Int((Double(index / 4) + 0.5) * 1220.5))
+                    for channel in 0..<3 {
+                        #expect(abs(Int(pixel[channel]) - colors[index][channel]) <= 8, "slot \(index), channel \(channel)")
+                    }
+                    #expect(pixel[3] == 255)
+                }
+                if format == .png {
+                    #expect(image.pixel(0, 0)[3] == 0)
+                } else {
+                    #expect(image.pixel(0, 0).prefix(3).allSatisfy { $0 >= 245 })
+                }
+                print("16-photo stress: \(format.rawValue), 8192×4882, \(result.byteCount) bytes, \(Date().timeIntervalSince(started)) seconds including decode")
+            }
+            exporter.discard(result)
+            #expect(!FileManager.default.fileExists(atPath: result.fileURL.path))
+        }
+    }
+
     private func exportedFiles(in exporter: CollageExporter) throws -> [URL] {
         guard let items = FileManager.default.enumerator(at: exporter.temporaryRoot, includingPropertiesForKeys: [.isRegularFileKey]) else {
             return []
@@ -130,6 +194,17 @@ struct CollageExporterTests {
         return try items.compactMap { $0 as? URL }.filter {
             try $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true
         }.map { $0.resolvingSymlinksInPath() }
+    }
+}
+
+/// Supplies a fresh, importer-owned staging copy, just like the system picker provider.
+private struct CameraItem: PhotoImportItem {
+    let original: URL
+
+    func loadFile() async throws -> URL {
+        let staged = original.deletingLastPathComponent().appending(path: "staged-\(UUID().uuidString).jpg")
+        try FileManager.default.copyItem(at: original, to: staged)
+        return staged
     }
 }
 
@@ -168,6 +243,27 @@ private final class Fixture {
             originalURLs: [redID: try solidPNG([255, 0, 0, 255]), blueID: try solidPNG([0, 0, 255, 255])],
             dimensions: size, format: format, jpegQuality: 0.9, filename: project.name
         )
+    }
+
+    /// A synthetic twelve-megapixel original; generated one at a time, never retained decoded.
+    func cameraJPEG(_ rgb: [Int]) throws -> URL {
+        try autoreleasepool {
+            let url = directory.appending(path: "\(UUID().uuidString).jpg")
+            guard let context = CGContext(
+                data: nil, width: 3024, height: 4032, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { throw CollageExportError.writeFailed }
+            context.setFillColor(CGColor(srgbRed: Double(rgb[0]) / 255, green: Double(rgb[1]) / 255, blue: Double(rgb[2]) / 255, alpha: 1))
+            context.fill(CGRect(x: 0, y: 0, width: 3024, height: 4032))
+            guard let image = context.makeImage(),
+                  let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
+                throw CollageExportError.writeFailed
+            }
+            CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.95] as CFDictionary)
+            guard CGImageDestinationFinalize(destination) else { throw CollageExportError.writeFailed }
+            return url
+        }
     }
 
     private func solidPNG(_ rgba: [UInt8]) throws -> URL {

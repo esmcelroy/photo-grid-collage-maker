@@ -60,6 +60,28 @@ struct CollagePreviewTests {
         }
     }
 
+    @Test func downsamplePreservesOpaqueColorsAndTransparency() throws {
+        let store = PreviewFixtureStore()
+        let original = try store.writePNG(width: 8, height: 4) { x, y in
+            y >= 2 ? rgba(0, 0, 0, 0) : (x < 4 ? rgba(160, 40, 200, 255) : rgba(20, 190, 80, 255))
+        }
+        let image = try CollagePreviewLoader.downsample(at: original, maximumPixelSize: 8)
+        var samples = [UInt8](repeating: 0, count: 8 * 4 * 4)
+        let context = try #require(CGContext(
+            data: &samples, width: 8, height: 4, bitsPerComponent: 8, bytesPerRow: 8 * 4,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: 8, height: 4))
+        func pixel(_ x: Int, _ y: Int) -> [UInt8] {
+            let offset = (y * 8 + x) * 4
+            return Array(samples[offset..<(offset + 4)])
+        }
+        #expect(pixel(1, 1) == [160, 40, 200, 255])
+        #expect(pixel(6, 1) == [20, 190, 80, 255])
+        #expect(pixel(1, 3) == [0, 0, 0, 0])
+    }
+
     private func singleLayout() throws -> GridLayout {
         try GridLayout(
             id: "preview-single",

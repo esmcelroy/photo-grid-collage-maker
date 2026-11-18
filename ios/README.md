@@ -12,26 +12,89 @@ so expect it to change.
 The library now creates local collages and reopens saved projects. Each project
 opens the system Photos picker, imports selected photos, and displays a native
 count-aware collage preview. Imports save automatically and survive app relaunch.
-Edit layout and photos opens a live-preview draft with count-aware layout selection,
-horizontal/vertical crop position, 90-degree rotation, 50–300% zoom, reset and swapping.
-Edit style opens a compact sheet for photo spacing, corner radius, transparent or
-preset backgrounds, and custom sRGB color with opacity. Done returns to the same
-draft without persisting; the parent Save/Cancel still applies to all changes.
+The project opens directly in a live-preview workspace with count-aware visual layout
+selection, horizontal/vertical crop position, 90-degree rotation, 50–300% zoom, reset
+and swapping. Photos, Layout and Style share one scrolling controls area beneath a
+pinned compact preview. Style edits photo spacing, corner radius, transparent or preset
+backgrounds, and custom sRGB color with opacity, without another editing sheet.
 Standard spacing/radius ranges
 match the web editor (0–40 and 0–32, step 2); valid saved values above these ranges
 remain available without being clamped on opening. Named preset choices, native
 selection checkmarks and a written background status supplement color cues.
-Save (the checkmark) atomically persists edits; Cancel (the close button) leaves the saved project unchanged. Selecting
-a different layout resets assignments and transforms; swapping keeps transforms
+Save atomically persists edits and stays in the workspace; confirmed Discard reverts the
+draft without changing the saved project. Selecting a different layout resets assignments
+and transforms; swapping keeps transforms
 with the slots, matching the web editor. Editing is disabled during photo import.
-Naming/deletion controls and sharing remain in the
-`collage-ios` backlog. The product scope and rules are in [`AGENTS.md`](AGENTS.md).
+Library project actions include rename, independent duplication, confirmed deletion,
+and native backup/restore. Export offers exact-size PNG/JPEG images through the system
+share sheet. The product scope and rules are in [`AGENTS.md`](AGENTS.md).
 
 The native core now includes versioned project/photo/settings/transform models,
 the generated layout catalog, and shared cell and photo geometry. These are value
 types, independent of SwiftUI and main-actor isolation. The storage and rendering
 layers consume this core independently of SwiftUI. `LibraryView` owns one store;
 `ProjectView` binds import completion and preview reads to its originating project.
+
+## Sixteen-photo stress verification
+
+`testSixteenPhotoPickerLimitReopenAndExport` drives the real system picker with sixteen
+synthetic library images, checks rendered color at every preview-slot center, verifies the
+persisted count and disabled Add Photos button, relaunches and reopens that same project,
+then prepares both 1920 × 1920 PNG and JPEG images and opens their native share sheets.
+Run `ios/scripts/seed-simulator-photos.py` for the selected simulator immediately before
+this stress journey so its newest sixteen images are known synthetic fixtures; the script
+adds images and never deletes existing library contents. Selection takes visible unselected
+photos before scrolling: the system picker virtualizes its image query, so query indices
+are not stable library-wide indices. This is functional coverage, not an accessibility
+waiver; the existing audited journeys and exception predicates are unchanged.
+
+`CollageExporterTests.sixteenCameraOriginalsReopenAndExportEverySlot` imports sixteen
+distinct synthetic 3024 × 4032 JPEG originals through `PhotoImporter`, rejects a
+seventeenth item, reopens the saved project through a fresh store, and exports PNG/JPEG
+at 8192 × 4882 (39,993,344 pixels). It decodes both files and independently checks all
+sixteen grid centers, exact size/format, transparent PNG corners and white JPEG corners.
+These flat-color fixtures exercise camera-sized decoding and the near-40 MP output
+allocation, not the encoding complexity of arbitrary real photographs.
+
+Final real-picker stress evidence: `.amp/in/artifacts/native-sixteen-corrected.xcresult`
+(one test passed in 385 seconds), with inspected workspace/PNG/JPEG screenshots under
+`native-sixteen-corrected-captures`. All sixteen rendered preview centers pass their
+color checks; the same saved project survives relaunch and both share sheets open.
+The stress work exposed blank Canvas cells despite populated thumbnails. Normalizing
+bounded ImageIO thumbnails to explicit premultiplied sRGB pixels fixes that preview
+without changing originals or export resolution. A controlled reversal fails the same
+rendered-pixel check; the exact internal SwiftUI cause is not established.
+
+The full run `native-sixteen-full-suite.xcresult` executed 71 logical tests: 69 passed,
+2 failed, none skipped. All 64 core tests and the other five functional UI journeys
+passed. One failure was the picker test's unstable global-index selection; the corrected
+stress-only rerun above passes without loosening its color assertion. The other is the
+owner-accepted, unfiltered offscreen Photo contrast report. The entire suite was not
+rerun after the test-only selector correction, and no all-green suite is claimed.
+The separate, unwaived Export Dynamic Type warning remains tracked in
+`collage-ios-later.4`; the original audited journey stops earlier at Photo contrast.
+
+The earlier core/memory evidence is `native-sixteen-final-core.xcresult` and
+`native-sixteen-memory.json`: sampled peak simulator app RSS was 496.2 MiB across
+fixture generation, tests and output-verification decoding. Near-40 MP PNG/JPEG
+render-plus-verification times in that run were 9.33/8.53 seconds. These measurements
+are not exporter-only memory, physical-device footprint, real-photo encoding benchmarks,
+or an iPhone 12 reliability guarantee.
+
+## Personal-device installation readiness
+
+The connected iPhone 12 is paired and has Developer Mode enabled. An unsigned ARM64
+device build succeeds. Xcode has a free Personal Team configured, but this Mac has no
+valid development signing identity or installed provisioning profile. A local signed
+build without provisioning updates fails because no iOS App Development profile exists
+for `ca.esmcelroy.CollageMaker`.
+
+Sideloading therefore still needs development signing assets and a signed build/install.
+Creating those assets changes the Apple account and requires approval; no certificate,
+profile, App Store/TestFlight upload, or device install was performed. No paid membership
+is required to try Personal Team signing. Team selection can be passed as a local build
+override rather than committing account-specific signing settings. Physical-device,
+iOS 18 runtime and device-memory verification remain outstanding.
 
 ## Models and geometry contracts
 
@@ -99,6 +162,55 @@ The library reports damaged manifests separately and counts missing originals;
 one damaged project does not hide healthy ones. Application Support data is not
 excluded from system backups: backup policy remains undecided, and local-only
 does not mean device backups cannot contain photos.
+
+## Inline editing workspace
+
+Opening a project pushes one workspace onto the library's navigation stack. A compact,
+aspect-correct composition preview stays above a single scrolling area containing Photos,
+visual Layout choices, Style and photo adjustments. Layout and Style remain inline;
+there are no editor/style sheets or editing tabs. Tapping a photo in the slot strip
+selects its slot and scrolls directly to its crop, rotation, zoom and swap controls;
+Layout and Style stay open. System Photos, Files, color and share pickers still use
+their native presentations.
+
+Settings and photo adjustments edit an explicit draft. **Save** stays in the workspace
+and updates the saved baseline only after persistence succeeds. **Discard** asks for
+confirmation and reverts in place. **Projects** asks before leaving a dirty draft;
+**Keep Editing** retains it. Save/Discard remain below the scrolling controls while the
+draft is dirty. Save failures retain the draft for retry. Photo imports persist as before;
+Add Photos and Export are disabled until a dirty draft is saved or discarded, so neither
+action implicitly commits or loses edits. Export is a normal navigation destination,
+and its Workspace button returns to the editor.
+
+## Project management and native backups
+
+Each library card has a **Project actions** menu: **Rename**, **Duplicate**, **Back Up**
+and **Delete**. Names are trimmed and must contain 1–200 characters. Duplicate creates
+an independent project named “<name> copy”; long names are shortened to fit. Delete
+opens a confirmation sheet, including for unreadable projects. Cancelling either sheet
+leaves the saved project unchanged. Pending operations prevent duplicate submissions.
+
+**Back Up → Create Backup** prepares a version-1 native JSON file containing the project
+manifest and base64-encoded originals. **Save Backup** uses the system Files picker;
+**Share Backup** uses the system share sheet. **Restore Backup** opens Files and always
+creates a new project, even when its name matches an existing project. New project/photo
+UUIDs and remapped slot references keep duplicates and restored projects independent.
+Original bytes, oriented sizes, selected layout, assignments, transforms and settings
+are preserved. Missing originals prevent backup/duplication instead of producing an
+incomplete copy.
+
+These backups are **not compatible with web backups**. The encoded file limit is
+**200 MiB**, enforced on both creation and restoration. Restore rejects invalid versions,
+references, settings, transforms, unsupported/undecodable images and mismatched pixel
+sizes. It stages the complete project before publishing it with one directory move;
+failed restores do not replace existing projects. Store work runs off-main on the
+serialized store actor. Large JSON/base64 files can require several hundred MB of
+memory; the limit is not a physical-device reliability guarantee.
+
+Backups contain original photos: keep them private and save them somewhere safe before
+removing projects or the app. Temporary share files are removed when their backup sheet
+closes; a file explicitly saved through Files remains at the destination you chose.
+This adds no automatic cloud sync and does not change the system-device-backup policy.
 
 ## Import and preview components
 
@@ -249,6 +361,145 @@ need one.
 Simulator runs only cover the simulator runtimes installed on the Mac. They are not
 physical-device testing, and they don't prove iOS 18 behaviour unless an iOS 18
 runtime is installed and used.
+
+### Inline workspace verification
+
+Three Grok 4.7 subscription-backed threads implemented the inline workspace,
+single-stack navigation and updated UI journeys. The coordinator owns integration,
+Beads and combined verification. The following is the initial integration checkpoint;
+see the sixteen-photo verification above for the latest results.
+
+The unsigned simulator build and **62 core tests in 11 suites pass** on iPhone 17 Pro /
+iOS 26.3.1. The largest-text shell test opens and cancels the real Photos picker.
+The redesigned project-management journey passes real Files backup/restore, sharing,
+rename, duplication, confirmed deletion and retained rotation. Default-size preview,
+footer and controls geometry assertions pass while scrolling Layout, Style and Photo;
+those screenshots were inspected. The 105-layout drift and Git whitespace checks pass.
+
+**The full UI suite is not green.** The current populated-workspace accessibility
+audit reports a layout label as partially unsupported for Dynamic Type. Enlarging
+semantic layout text from caption to subheadline moved the report from Top Focus to
+Bottom Focus rather than resolving it; the font choice is not a verified cause.
+A controlled comparison of the same fully visible Bottom Focus label confirms scaling:
+18pt label height at `UICTContentSizeCategoryL`, versus 116.7pt with two lines at
+Accessibility XXXL. The normal-size Dynamic Type audit reports no issues; the largest
+size still reports four fully visible layout labels as fonts the user cannot change.
+This is neither missing growth nor clipping. [Apple DTS documents the same SwiftUI
+warning](https://developer.apple.com/forums/thread/828525): the audit checks a UIKit
+font-adjustment flag that synthesized SwiftUI accessibility nodes may not expose.
+The owner approved a narrow exception with retained scaling checks. The picker/edit
+journey now measures all four Focus labels in the same saved project at explicit Large
+and Accessibility XXXL settings. Each label must be hittable, fully contained and grow
+by more than 1.5× in height before it can qualify; a fixed 15pt font stays on one line
+at either grid width and must fail. The audit policy is limited to iOS 26.3, those four
+labels under their exact layout buttons, the exact SwiftUI font warning, matching
+nonempty visible frames, and at most one report per label per audit. Every acceptance
+is logged and attached. Other labels, categories, OS versions, element-less reports,
+duplicates, clipping/contrast issues and audit timeouts remain failures. The preexisting
+system-alert exception is unchanged. The final full run verifies this policy and
+still fails one unrelated, unfiltered contrast report described below.
+Comparison evidence: `.amp/in/artifacts/audit-size.xcresult` and `.amp/in/audit-size.log`.
+The temporary diagnostic tests were removed.
+The final-source retained pinning test passes on a fresh simulator, including actual
+picker import, dirty footer/preview geometry, Save/reopen and largest-text reachability
+via the photo-strip shortcut (`workspace-pinning-ordered.xcresult`, 315.8 seconds).
+All six final captures were directly inspected. Rotation uses full-width stacked buttons
+at accessibility text sizes and keeps its normal horizontal row, eliminating the narrow
+columns found in the earlier capture. The largest-text journey visits sections in visual
+order; attempt limits and whole-control containment requirements were not weakened.
+An earlier post-rotation run failed a backward lookup for an offscreen lazy layout button;
+that failed run remains recorded in `workspace-pinning-stacked-rotation.xcresult`.
+No category is skipped. Only the approved layout-label policy above is being added.
+The old occluded-editor-navigation exceptions are removed; the previously approved
+narrow system-discard-alert Dynamic Type exception remains.
+
+The approved policy passed the scaling comparison and accepted exactly four matching
+warnings in `workspace-scoped-audit-full.xcresult`; 62 core tests and four other UI
+journeys passed. That run's main journey stopped on a 0.0000102pt right-edge difference
+in AX preview containment. Its assertion now permits only 0.001pt numerical roundoff.
+A subsequent focused run found Zoom's correct 105% label on the Stepper, not a separate
+StaticText; those assertions now target the Stepper. The next main run reached an
+unfiltered contrast failure on `photoControls` in the disabled-swap audit. The capture
+shows that heading above the scroll viewport and readable visible swap/footer content,
+but the underlying audit cause is not established. This contrast report is not covered
+by the layout exception. The final-source full suite in
+`workspace-scoped-audit-final.xcresult` finishes with **66 passed, 1 failed, 0 skipped**:
+62 core tests and all four other UI journeys pass. All four Focus labels grow from 18pt
+to 116.7pt, and exactly four approved warnings are accepted and attached. The remaining
+failure is `photoControls` contrast: reported label frame `(16, 77.7, 47, 20.3)` lies
+outside workspaceControls `(0, 326, 402, 390)`. The final normal/large scaling and
+disabled-swap captures were inspected. No contrast exception was added. The main
+journey stops at that audit, so its subsequent save/relaunch/export assertions have
+not completed on this final source; the suite is not green and backlog gates stay open.
+
+A follow-up [standalone scroll-contrast reproduction](Diagnostics/ScrollContrastRepro/README.md)
+now reproduces the clipped-out heading report without any collage code, images, storage,
+or disabled controls. Visible normal-contrast text passes, while scrolling it behind
+pinned content produces the warning. Explicit scroll/content accessibility containment,
+clipping, and lazy layout do not fix it; List instead reports a different clipped-out row.
+The fixture's final strict run has **1 passing control and 7 unfiltered failures**
+(including the deliberately pale visible-text control), not a green application gate.
+Production views, audits, and exceptions are unchanged. The reproduction supports a
+framework/audit clipping interaction; its private implementation and other OS versions
+remain unverified. No Apple report has been submitted.
+
+The owner has accepted the single known Photo-heading contrast failure as non-blocking
+for continued native development. It remains visible in test results; this is not an
+additional audit exception or acceptance of unrelated failures. Apple feedback is a
+non-blocking P3 follow-up in Beads (`collage-ios-later.3`). The original audited journey
+is retained, with focused functional verification independent of its early audit failure.
+
+Focused continuation now passes **63 tests, 0 failures, 0 skips** in
+`.amp/in/artifacts/native-functional-save-export.xcresult`: all 62 core tests plus
+`testSavedEditsReopenDiscardAndExport`. The real-picker journey changes layout,
+rotation, zoom, spacing, radius and background; saves without navigating; relaunches
+and reopens the same project; discards a reset draft back to the saved transforms;
+then creates a 608 × 1080 JPEG, opens the native share sheet, reaches the Photos
+add permission prompt (denied), invalidates the prepared export and returns to the
+workspace. All six retained screenshots were inspected. The existing core suites
+continue to decode real PNG/JPEG output; this UI run checks readiness and sharing,
+not a new pixel-by-pixel preview/export comparison.
+
+This focused test is functional coverage, not an accessibility pass: it calls the
+shared export helper with `auditAccessibility: false`, while the original audited
+journey retains the default full export audits and all its existing checks.
+An intervening run exposed a separate **unwaived export-screen Dynamic Type warning**
+at the default export audit, before image creation. Evidence is
+`native-save-reopen-export-final.xcresult`; investigation is tracked as
+`collage-ios-later.4`, not covered by the accepted Photo contrast failure. The full
+native accessibility suite has not been rerun or declared green.
+
+Negative control: `layout-scaling-fixed-font-clean.xcresult` fails the new growth guard
+for Left Focus at 18pt in both size settings. Semantic typography was restored before
+all normal runs. Initial scoped evidence: `workspace-scoped-audit-full.xcresult`.
+Earlier workspace evidence: `.amp/in/workspace-validation.log`,
+`.amp/in/artifacts/workspace-validation.xcresult` and inspected captures under
+`.amp/in/artifacts/workspace-review/`.
+An unsigned **arm64 device build also passes** (`.amp/in/workspace-device-build.log`),
+but no app was signed or installed on the connected iPhone 12 and no phone settings
+were changed. Hardware, iOS 18 and device-memory limits remain unverified.
+
+### Project management verification
+
+The unsigned build and **62 core tests in 11 suites pass** on iPhone 17 Pro /
+iOS 26.3.1. A focused UI run passes both the library/About test and the new project
+management journey: real photo import, rotation/save, rename, independent duplicate,
+confirmed deletion/cancellation, backup through the system Files and share sheets,
+restore into a new project, and preserved photos/rotation. Default rename/delete/backup
+audits pass without new exceptions. Largest-text rename/delete audits pass; backup
+save/share controls remain reachable by scrolling. Final captures were inspected.
+
+**The full UI suite is not green.** The existing import/edit/export journey stops at
+its default editor accessibility audit with XCTest error -56, "Audit failed to complete
+in time." This recurred in a targeted rerun and after restarting the dedicated simulator;
+the cause is not established. No audit was skipped or given a new exception. The
+largest-text shell test passed in the broader run. Evidence is under `.amp/in/`:
+`management-final.log`, `management-focused.log`, `management-regression.log`,
+`management-regression-reboot.log`, their `.xcresult` bundles in `artifacts/`, and
+`artifacts/management-review/`. This records the earlier project-management checkpoint;
+see the current-state and sixteen-photo sections above for subsequent integration.
+
+The milestone notes below describe earlier runs, not a current all-green suite.
 
 The editor integration was checked on the iOS 26.3 simulator using Xcode 26.3:
 the unsigned build and 45 core tests pass. Both existing shell UI tests pass.

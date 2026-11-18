@@ -1,0 +1,35 @@
+// !$*UTF8*$!
+{
+ archiveVersion = 1;
+ classes = {};
+ objectVersion = 77;
+ objects = {
+  A00000000000000000000001 = {isa = PBXProject; attributes = {LastUpgradeCheck = 2630; TargetAttributes = {A00000000000000000000010 = {CreatedOnToolsVersion = 26.3;}; A00000000000000000000020 = {CreatedOnToolsVersion = 26.3; TestTargetID = A00000000000000000000010;};};}; buildConfigurationList = A00000000000000000000030; compatibilityVersion = "Xcode 16.0"; developmentRegion = en; knownRegions = (en, Base); mainGroup = A00000000000000000000002; productRefGroup = A00000000000000000000003; projectDirPath = ""; projectRoot = ""; targets = (A00000000000000000000010, A00000000000000000000020);};
+  A00000000000000000000002 = {isa = PBXGroup; children = (A00000000000000000000004, A00000000000000000000005, A00000000000000000000003); sourceTree = "<group>";};
+  A00000000000000000000003 = {isa = PBXGroup; children = (A00000000000000000000006, A00000000000000000000007); name = Products; sourceTree = "<group>";};
+  A00000000000000000000004 = {isa = PBXFileSystemSynchronizedRootGroup; path = App; sourceTree = "<group>";};
+  A00000000000000000000005 = {isa = PBXFileSystemSynchronizedRootGroup; path = UITests; sourceTree = "<group>";};
+  A00000000000000000000006 = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ScrollContrastRepro.app; sourceTree = BUILT_PRODUCTS_DIR;};
+  A00000000000000000000007 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ScrollContrastReproUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR;};
+  A00000000000000000000010 = {isa = PBXNativeTarget; buildConfigurationList = A00000000000000000000031; buildPhases = (A00000000000000000000011, A00000000000000000000012, A00000000000000000000013); buildRules = (); dependencies = (); fileSystemSynchronizedGroups = (A00000000000000000000004); name = ScrollContrastRepro; productName = ScrollContrastRepro; productReference = A00000000000000000000006; productType = "com.apple.product-type.application";};
+  A00000000000000000000011 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
+  A00000000000000000000012 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
+  A00000000000000000000013 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
+  A00000000000000000000020 = {isa = PBXNativeTarget; buildConfigurationList = A00000000000000000000032; buildPhases = (A00000000000000000000021, A00000000000000000000022, A00000000000000000000023); buildRules = (); dependencies = (A00000000000000000000024); fileSystemSynchronizedGroups = (A00000000000000000000005); name = ScrollContrastReproUITests; productName = ScrollContrastReproUITests; productReference = A00000000000000000000007; productType = "com.apple.product-type.bundle.ui-testing";};
+  A00000000000000000000021 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
+  A00000000000000000000022 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
+  A00000000000000000000023 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
+  A00000000000000000000024 = {isa = PBXTargetDependency; target = A00000000000000000000010; targetProxy = A00000000000000000000025;};
+  A00000000000000000000025 = {isa = PBXContainerItemProxy; containerPortal = A00000000000000000000001; proxyType = 1; remoteGlobalIDString = A00000000000000000000010; remoteInfo = ScrollContrastRepro;};
+  A00000000000000000000030 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000040, A00000000000000000000041); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+  A00000000000000000000031 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000042, A00000000000000000000043); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+  A00000000000000000000032 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000044, A00000000000000000000045); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+  A00000000000000000000040 = {isa = XCBuildConfiguration; buildSettings = {SDKROOT = iphoneos; ALWAYS_SEARCH_USER_PATHS = NO; IPHONEOS_DEPLOYMENT_TARGET = 18.0; SWIFT_VERSION = 6.0; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; DEBUG_INFORMATION_FORMAT = dwarf; ENABLE_TESTABILITY = YES;}; name = Debug;};
+  A00000000000000000000041 = {isa = XCBuildConfiguration; buildSettings = {SDKROOT = iphoneos; ALWAYS_SEARCH_USER_PATHS = NO; IPHONEOS_DEPLOYMENT_TARGET = 18.0; SWIFT_VERSION = 6.0;}; name = Release;};
+  A00000000000000000000042 = {isa = XCBuildConfiguration; buildSettings = {PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = ca.esmcelroy.ScrollContrastRepro; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES; INFOPLIST_KEY_UILaunchScreen_Generation = YES; INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait; TARGETED_DEVICE_FAMILY = 1; CODE_SIGN_STYLE = Automatic;}; name = Debug;};
+  A00000000000000000000043 = {isa = XCBuildConfiguration; buildSettings = {PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = ca.esmcelroy.ScrollContrastRepro; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES; INFOPLIST_KEY_UILaunchScreen_Generation = YES; INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait; TARGETED_DEVICE_FAMILY = 1; CODE_SIGN_STYLE = Automatic;}; name = Release;};
+  A00000000000000000000044 = {isa = XCBuildConfiguration; buildSettings = {PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = ca.esmcelroy.ScrollContrastReproUITests; GENERATE_INFOPLIST_FILE = YES; TEST_TARGET_NAME = ScrollContrastRepro; TARGETED_DEVICE_FAMILY = 1; CODE_SIGN_STYLE = Automatic;}; name = Debug;};
+  A00000000000000000000045 = {isa = XCBuildConfiguration; buildSettings = {PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = ca.esmcelroy.ScrollContrastReproUITests; GENERATE_INFOPLIST_FILE = YES; TEST_TARGET_NAME = ScrollContrastRepro; TARGETED_DEVICE_FAMILY = 1; CODE_SIGN_STYLE = Automatic;}; name = Release;};
+ };
+ rootObject = A00000000000000000000001;
+}

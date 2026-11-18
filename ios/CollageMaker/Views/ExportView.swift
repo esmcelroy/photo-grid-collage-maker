@@ -3,7 +3,6 @@ import SwiftUI
 /// Exports one project snapshot at an exact pixel size, then offers the system share sheet.
 /// The snapshot is fixed when the sheet opens, so later edits can't change a pending export.
 struct ExportView: View {
-    @Environment(\.dismiss) private var dismiss
     let project: CollageProject
     let layout: GridLayout
     let originalURLs: [UUID: URL]
@@ -17,6 +16,7 @@ struct ExportView: View {
     @State private var exported: ExportedCollage?
     @State private var errorMessage: String?
     @FocusState private var focusedField: Field?
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private enum Field { case width, height }
@@ -32,57 +32,60 @@ struct ExportView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    sizeSection
-                    formatSection
-                }
-                .disabled(pending != nil)
-                .padding(24)
+        // Pushed by the workspace onto the library's NavigationStack. No nested stack,
+        // so the leading Workspace button is the only back control.
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                sizeSection
+                formatSection
+            }
+            .disabled(pending != nil)
+            .padding(24)
+            .frame(maxWidth: 600)
+            .frame(maxWidth: .infinity)
+        }
+        // Pinned so creating and sharing never scroll the options away.
+        .safeAreaInset(edge: .bottom) {
+            VStack(alignment: .leading, spacing: 8) { exportSection }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
                 .frame(maxWidth: 600)
                 .frame(maxWidth: .infinity)
-            }
-            // Pinned so creating and sharing never scroll the options away.
-            .safeAreaInset(edge: .bottom) {
-                VStack(alignment: .leading, spacing: 8) { exportSection }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: 600)
-                    .frame(maxWidth: .infinity)
-                    .background(Color(uiColor: .systemGroupedBackground))
-            }
-            .scrollDismissesKeyboard(.interactively)
-            .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Export")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color(uiColor: .systemGroupedBackground), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    // Closing during an export cancels it; the exporter deletes any partial file.
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .frame(minWidth: 44, minHeight: 44)
-                    }
-                    .accessibilityLabel(pending == nil ? "Close" : "Cancel export")
-                    .accessibilityIdentifier("closeExport")
-                }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { focusedField = nil }
-                }
-            }
-            .onAppear {
-                // No share sheet can be using a file yet, so clear anything an earlier session left.
-                exporter.discardAll()
-            }
-            .onDisappear {
-                pending?.cancel()
-                discardExport()
-            }
-            .onChange(of: optionsKey) { discardExport() }
+                .background(Color(uiColor: .systemGroupedBackground))
         }
+        .scrollDismissesKeyboard(.interactively)
+        .background(Color(uiColor: .systemGroupedBackground))
+        .navigationTitle("Export")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbarBackground(Color(uiColor: .systemGroupedBackground), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                // Popping during an export cancels it; the exporter deletes any partial file.
+                Button {
+                    closeExport()
+                } label: {
+                    Label("Workspace", systemImage: "chevron.backward")
+                        .labelStyle(.titleAndIcon)
+                }
+                .accessibilityLabel(pending == nil ? "Workspace" : "Cancel export")
+                .accessibilityIdentifier("closeExport")
+            }
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { focusedField = nil }
+            }
+        }
+        .onAppear {
+            // No share sheet can be using a file yet, so clear anything an earlier session left.
+            exporter.discardAll()
+        }
+        .onDisappear {
+            pending?.cancel()
+            discardExport()
+        }
+        .onChange(of: optionsKey) { discardExport() }
     }
 
     private var sizeSection: some View {
@@ -280,5 +283,10 @@ struct ExportView: View {
     private func discardExport() {
         if let exported { exporter.discard(exported) }
         exported = nil
+    }
+
+    /// Pops this destination. The library stack is the parent, so dismiss returns to the workspace.
+    private func closeExport() {
+        dismiss()
     }
 }

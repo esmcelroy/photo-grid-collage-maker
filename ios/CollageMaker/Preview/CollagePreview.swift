@@ -298,7 +298,18 @@ enum CollagePreviewLoader {
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
             throw CollagePreviewError.unreadableOriginal
         }
-        return image
+        // Some ImageIO thumbnails render as blank cells in SwiftUI Canvas even though
+        // Image views display them correctly. Give the preview explicit premultiplied
+        // sRGB pixels; retain bounded dimensions and alpha without touching originals.
+        guard let context = CGContext(
+            data: nil, width: image.width, height: image.height,
+            bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { throw CollagePreviewError.unreadableOriginal }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        guard let normalized = context.makeImage() else { throw CollagePreviewError.unreadableOriginal }
+        return normalized
     }
 
     private static func message(_ error: CollageValidationError) -> String {

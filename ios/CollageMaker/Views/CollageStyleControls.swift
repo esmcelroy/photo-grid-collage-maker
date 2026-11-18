@@ -96,7 +96,7 @@ enum CollageStyle {
 }
 
 /// Spacing, corner radius and background controls bound to an editor draft's settings.
-/// The editor presents these in its "Style" sheet, which supplies the title.
+/// The workspace presents these inline beneath its Style heading.
 struct CollageStyleControls: View {
     @Binding var settings: CollageSettings
     @ScaledMetric(relativeTo: .body) private var swatchDiameter: CGFloat = 24

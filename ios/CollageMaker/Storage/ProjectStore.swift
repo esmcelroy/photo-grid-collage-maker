@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 /// A picker file the importer has already copied to a local URL, plus its oriented pixel size.
 /// The store copies the bytes unchanged; it never decodes or re-encodes originals.
@@ -78,6 +79,9 @@ enum ProjectStoreError: Error, Equatable, Sendable {
 ///
 /// Backup policy is not decided: files in Application Support are included in device backups
 /// unless excluded, and this store does not exclude them.
+///
+/// Project backup files (`backupProject`) are the app's own versioned JSON format with every
+/// original embedded; see `ProjectBackup`. They are not compatible with web app backups.
 actor ProjectStore {
     static let manifestFilename = "project.json"
     static let originalsDirectoryName = "Originals"
@@ -85,12 +89,20 @@ actor ProjectStore {
     static let maximumNameLength = 200
 
     nonisolated let rootURL: URL
+    /// Where `backupProject` writes files for sharing or exporting, one folder per backup.
+    nonisolated let temporaryBackupRoot: URL
     private let catalog: LayoutCatalog
     private let fileManager = FileManager.default
 
-    init(rootURL: URL, catalog: LayoutCatalog) {
+    init(
+        rootURL: URL,
+        catalog: LayoutCatalog,
+        temporaryBackupRoot: URL = FileManager.default.temporaryDirectory
+            .appending(path: "CollageBackups", directoryHint: .isDirectory)
+    ) {
         self.rootURL = rootURL
         self.catalog = catalog
+        self.temporaryBackupRoot = temporaryBackupRoot
     }
 
     /// The production root: `Application Support/CollageProjects` in the app container.
@@ -201,6 +213,140 @@ actor ProjectStore {
         try fileManager.moveItem(at: directory, to: trashed)
         // Already gone from the library; anything left behind is purged by `listProjects`.
         try? fileManager.removeItem(at: trashed)
+    }
+
+    // MARK: - Copies and backups
+
+    /// Adds a copy of a project named "<name> copy" (shortened to fit 200 characters). The copy
+    /// has new project and photo IDs and keeps the layout, slot assignments, transforms, settings
+    /// and original bytes. Originals are copied as bytes, not decoded. If any original is
+    /// missing, this throws `missingOriginal` and adds nothing.
+    func duplicateProject(_ projectID: UUID) throws -> CollageProject {
+        let source = try readManifest(projectID)
+        for photo in source.photos where !isRegularFile(originalURL(projectID, photo)) {
+            throw ProjectStoreError.missingOriginal(photo.id)
+        }
+        return try publishCopy(of: source, named: Self.copyName(for: source.name)) { photo, newID, originals in
+            let filename = "\(newID.uuidString).\(Self.fileExtension(of: URL(filePath: photo.imageFilename)))"
+            let destination = originals.appending(path: filename)
+            try fileManager.copyItem(at: originalURL(projectID, photo), to: destination)
+            guard isRegularFile(destination) else { throw ProjectStoreError.missingOriginal(photo.id) }
+            return filename
+        }
+    }
+
+    /// Writes a self-contained backup of one project to a new uniquely named folder under
+    /// `temporaryBackupRoot` and returns the `.json` file. Pass it to `discardBackup(at:)` once
+    /// it has been shared or exported.
+    ///
+    /// Throws `missingOriginal` if an original is missing, and `ProjectBackupError.tooLarge`
+    /// (checked from file sizes before any original is read) if the file would exceed
+    /// `ProjectBackup.maximumFileBytes`, so it never writes a backup that restore would refuse.
+    func backupProject(_ projectID: UUID) throws -> URL {
+        let project = try readManifest(projectID)
+        var sources: [(photoID: UUID, url: URL)] = []
+        var payloadBytes = 0
+        for photo in project.photos {
+            let url = originalURL(projectID, photo)
+            guard isRegularFile(url), let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize else {
+                throw ProjectStoreError.missingOriginal(photo.id)
+            }
+            payloadBytes += (size + 2) / 3 * 4
+            sources.append((photo.id, url))
+        }
+
+        let limit = ProjectBackup.maximumFileBytes
+        let createdAt = Date()
+        // With empty data the encoding is exactly the backup minus its base64 payloads.
+        let envelope = try ProjectBackup.encoder.encode(ProjectBackup(
+            createdAt: createdAt, project: project,
+            originals: sources.map { ProjectBackup.Original(photoID: $0.photoID, data: Data()) }
+        ))
+        guard envelope.count + payloadBytes <= limit else { throw ProjectBackupError.tooLarge(limit: limit) }
+
+        let originals = try sources.map { source in
+            do {
+                return ProjectBackup.Original(photoID: source.photoID, data: try Data(contentsOf: source.url))
+            } catch {
+                throw ProjectStoreError.missingOriginal(source.photoID)
+            }
+        }
+        let data = try ProjectBackup.encoder.encode(
+            ProjectBackup(createdAt: createdAt, project: project, originals: originals)
+        )
+        // An original could have grown since its size was read.
+        guard data.count <= limit else { throw ProjectBackupError.tooLarge(limit: limit) }
+
+        let directory = temporaryBackupRoot.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let file = directory.appending(path: Self.backupFilename(for: project.name))
+        do {
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+            try data.write(to: file, options: .atomic)
+        } catch {
+            try? fileManager.removeItem(at: directory)
+            throw error
+        }
+        return file
+    }
+
+    /// Deletes a file returned by `backupProject`, with its folder. URLs that are not
+    /// in a backup folder directly under `temporaryBackupRoot` are ignored.
+    nonisolated func discardBackup(at url: URL) {
+        let directory = url.standardizedFileURL.deletingLastPathComponent()
+        guard url.isFileURL, UUID(uuidString: directory.lastPathComponent) != nil,
+              directory.deletingLastPathComponent().pathComponents
+                == temporaryBackupRoot.standardizedFileURL.pathComponents else { return }
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    /// Restores a backup file as a new project, with new project and photo IDs. The backup's
+    /// name, layout, slot assignments, transforms, settings and original bytes are kept.
+    ///
+    /// Opens security-scoped URLs itself, so a `fileImporter` URL can be passed directly. The file
+    /// size is checked before reading, then the envelope, project, photo list and every original
+    /// (a complete JPEG, PNG or HEIC whose oriented pixel size matches the manifest) are
+    /// validated while the project is staged. Only a fully valid project is published, so any
+    /// failure leaves the library unchanged. Throws `ProjectBackupError` for an invalid backup.
+    func restoreProject(from url: URL) throws -> CollageProject {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        let backup = try Self.decodeBackup(Self.readBackupFile(url))
+        let project = backup.project
+        do {
+            try project.validate(catalog: catalog)
+        } catch {
+            throw ProjectBackupError.invalid("The backup's project is invalid: \(error)")
+        }
+        guard let name = try? Self.validatedName(project.name) else {
+            throw ProjectBackupError.invalid("The backup's project name is invalid.")
+        }
+        var bytes: [UUID: Data] = [:]
+        for original in backup.originals {
+            guard bytes.updateValue(original.data, forKey: original.photoID) == nil else {
+                throw ProjectBackupError.invalid("A photo's original appears more than once.")
+            }
+        }
+        guard Set(bytes.keys) == Set(project.photos.map(\.id)) else {
+            throw ProjectBackupError.invalid("The backup's originals don't match its photos.")
+        }
+
+        return try publishCopy(of: project, named: name) { photo, newID, originals in
+            guard let data = bytes[photo.id] else {
+                throw ProjectBackupError.invalid("The backup's originals don't match its photos.")
+            }
+            let staged = originals.appending(path: newID.uuidString)
+            try data.write(to: staged)
+            guard case let .success(image) = PhotoImporter.inspect(staged) else {
+                throw ProjectBackupError.invalid("A photo is not a readable JPEG, PNG or HEIC image.")
+            }
+            guard image.width == photo.pixelWidth, image.height == photo.pixelHeight else {
+                throw ProjectBackupError.invalid("A photo's pixel size doesn't match its image.")
+            }
+            // Name the restored file by its actual format, as import does.
+            let filename = "\(newID.uuidString).\(image.type.preferredFilenameExtension ?? "img")"
+            try fileManager.moveItem(at: staged, to: originals.appending(path: filename))
+            return filename
+        }
     }
 
     // MARK: - Photos
@@ -349,6 +495,51 @@ actor ProjectStore {
         )
     }
 
+    /// Stages a new project with new project and photo IDs that keeps `source`'s layout, slot
+    /// areas, transforms, settings and pixel sizes, then publishes it with one directory move.
+    /// `storeOriginal` writes one photo's bytes into the staged Originals folder and returns the
+    /// file name it used. Any failure removes the staging folder, so nothing partial is published.
+    private func publishCopy(
+        of source: CollageProject,
+        named name: String,
+        storeOriginal: (_ photo: ProjectPhoto, _ newID: UUID, _ originals: URL) throws -> String
+    ) throws -> CollageProject {
+        try prepareDirectories()
+        let id = UUID()
+        let now = Date()
+        let staging = stagingURL.appending(path: id.uuidString, directoryHint: .isDirectory)
+        let originals = staging.appending(path: Self.originalsDirectoryName, directoryHint: .isDirectory)
+        do {
+            try fileManager.createDirectory(at: originals, withIntermediateDirectories: true)
+            var newIDs: [UUID: UUID] = [:]
+            var photos: [ProjectPhoto] = []
+            for photo in source.photos {
+                let newID = UUID()
+                let filename = try storeOriginal(photo, newID, originals)
+                newIDs[photo.id] = newID
+                photos.append(ProjectPhoto(
+                    id: newID, imageFilename: filename, pixelWidth: photo.pixelWidth, pixelHeight: photo.pixelHeight
+                ))
+            }
+            let positions = try source.positions.map { position in
+                guard let photoID = newIDs[position.photoID] else {
+                    throw CollageValidationError.invalid("A layout slot names an unknown photo.")
+                }
+                return PhotoPosition(photoID: photoID, area: position.area, transform: position.transform)
+            }
+            let project = CollageProject(
+                id: id, name: name, createdAt: now, updatedAt: now, photos: photos,
+                selectedLayoutID: source.selectedLayoutID, positions: positions, settings: source.settings
+            )
+            try write(project, to: staging.appending(path: Self.manifestFilename))
+            try fileManager.moveItem(at: staging, to: directoryURL(for: id))
+            return project
+        } catch {
+            try? fileManager.removeItem(at: staging)
+            throw error
+        }
+    }
+
     private func assignDefaultLayout(to project: inout CollageProject) throws {
         guard !project.photos.isEmpty else {
             project.selectedLayoutID = nil
@@ -397,6 +588,68 @@ actor ProjectStore {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed.count <= maximumNameLength else { throw ProjectStoreError.invalidName }
         return trimmed
+    }
+
+    private static func copyName(for name: String) -> String {
+        let suffix = " copy"
+        var base = name
+        while base.count + suffix.count > maximumNameLength { base.removeLast() }
+        return base.trimmingCharacters(in: .whitespaces) + suffix
+    }
+
+    /// "<name> backup.json" with path separators, reserved and control characters replaced and
+    /// leading dots removed. The name is cut to 200 UTF-8 bytes to stay within file name limits.
+    private static func backupFilename(for name: String) -> String {
+        let reserved = "/\\:*?\"<>|".unicodeScalars
+        var base = String(String.UnicodeScalarView(name.unicodeScalars.map { scalar in
+            CharacterSet.controlCharacters.contains(scalar) || reserved.contains(scalar) ? "_" : scalar
+        }))
+        while base.hasPrefix(".") { base.removeFirst() }
+        while base.utf8.count > 200 { base.removeLast() }
+        base = base.trimmingCharacters(in: .whitespaces)
+        return "\(base.isEmpty ? "Collage" : base) backup.json"
+    }
+
+    /// Reads at most `ProjectBackup.maximumFileBytes`, refusing larger files before decoding.
+    private static func readBackupFile(_ url: URL) throws -> Data {
+        let limit = ProjectBackup.maximumFileBytes
+        guard url.isFileURL,
+              let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+              values.isRegularFile == true else {
+            throw ProjectBackupError.notABackup
+        }
+        if let size = values.fileSize, size > limit { throw ProjectBackupError.tooLarge(limit: limit) }
+        let data: Data
+        do {
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            // One byte past the limit detects a file that grew after its size was read.
+            data = try handle.read(upToCount: limit + 1) ?? Data()
+        } catch {
+            throw ProjectBackupError.notABackup
+        }
+        guard data.count <= limit else { throw ProjectBackupError.tooLarge(limit: limit) }
+        return data
+    }
+
+    private static func decodeBackup(_ data: Data) throws -> ProjectBackup {
+        struct Header: Decodable {
+            let format: String?
+            let version: Int?
+        }
+        let decoder = JSONDecoder()
+        // Decode the whole backup once; the header alone only classifies a failure.
+        let backup = try? decoder.decode(ProjectBackup.self, from: data)
+        let header = backup.map { Header(format: $0.format, version: $0.version) }
+            ?? (try? decoder.decode(Header.self, from: data))
+        guard let header, header.format == ProjectBackup.formatIdentifier else {
+            throw ProjectBackupError.notABackup
+        }
+        guard header.version == ProjectBackup.currentVersion else {
+            throw ProjectBackupError.unsupportedVersion(header.version ?? 0)
+        }
+        guard let backup else { throw ProjectBackupError.invalid("The backup's contents are damaged.") }
+        return backup
     }
 
     private static func fileExtension(of url: URL) -> String {
